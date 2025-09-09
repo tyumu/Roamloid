@@ -7,6 +7,32 @@
 ### 前提
 - Node.js 18+（推奨: 20+）
 
+### クローン後の環境構築（Windows PowerShell）
+1. リポジトリをクローンして移動
+
+```powershell
+git clone https://github.com/tyumu/Roamloid.git
+cd Roamloid
+```
+
+2. 依存関係をインストール（lockfile がある場合は ci、無ければ install）
+
+```powershell
+if (Test-Path package-lock.json) { npm ci } else { npm i }
+```
+
+3. 開発サーバーを起動
+
+```powershell
+npm run dev
+```
+
+4. ブラウザで表示
+
+- http://localhost:5173/
+
+停止はターミナルで Ctrl+C。
+
 ### セットアップ
 1. 依存関係をインストール
 	- すでに `node_modules` が無い場合は自動でインストールしてください。
