@@ -1,0 +1,6 @@
+# <type>(<scope>): <summary>
+# 空行の後に詳細説明 (必要な場合)。72 桁目目安で改行。
+# 末尾に BREAKING CHANGE: を記載すると自動バージョン付け等に利用できる。
+# type: feat | fix | refactor | perf | docs | test | chore | style | build
+# scope: 任意 (api, socket, firebase など) / 省略可
+

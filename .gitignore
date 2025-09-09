@@ -41,3 +41,41 @@ desktop.ini
 *.swp
 *.swo
 .eslintcache
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.cache/
+*.cover
+*.py,cover
+*.log
+
+# Virtual Environments
+.venv/
+venv/
+env/
+backend/.venv/
+
+# Tooling
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/.ropeproject
+
+# Local environment overrides
+*.local.settings.json
+

@@ -1,55 +1,93 @@
 # Roamloid
-1体の3Dキャラクターが端末間を移動することで、あたかも“そこにいる”ように感じさせるWebアプリ
-## React + React Three Fiber サンプル
 
-このリポジトリは Vite + React + TypeScript 構成で、React Three Fiber によるシンプルな 3D サンプル（回転する Box と軌道カメラ）を表示します。
+1 体の 3D キャラが複数端末に“存在”している感を出すリアルタイム Web アプリ（学習用プロトタイプ）。
 
-### 前提
-- Node.js 18+（推奨: 20+）
+---
+## 今できること（最小）
+- `GET /api/health` でサーバー生存確認
+- `GET /api/hello` サンプルレスポンス
+- SocketIO 接続で `system` メッセージ受信
 
-### クローン後の環境構築（Windows PowerShell）
-1. リポジトリをクローンして移動
+---
+## 5 分クイックスタート
 
+### 1. Backend 起動
+前提: Python 3.11+
 ```powershell
-git clone https://github.com/tyumu/Roamloid.git
-cd Roamloid
+cd backend
+python -m venv .venv
+. .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy ..\..\.env.example .env  # 失敗したら手動で .env 作成
+python run.py   # → http://localhost:5000/api/health
 ```
 
-2. 依存関係をインストール（lockfile がある場合は ci、無ければ install）
-
+### 2. Frontend 起動
+前提: Node.js 18+ (20 推奨)
 ```powershell
-if (Test-Path package-lock.json) { npm ci } else { npm i }
+npm install
+npm run dev   # → http://localhost:5173/
 ```
 
-3. 開発サーバーを起動
+両方起動したら: ブラウザを開き、開発しつつ `api/health` が 200 になるのを確認。
 
-```powershell
-npm run dev
+---
+## フォルダざっくり
+```
+backend/        ← Flask + SocketIO
+	app/
+		routes/     ← /api/*
+		realtime/   ← WebSocket イベント
+		services/   ← Firebase など後で
+src/            ← React + Vite + (将来 3D)
+tests/          ← 簡単な Python テスト
+.env.example    ← 環境変数サンプル
+CONTRIBUTING.md ← ブランチ & コミットルール
 ```
 
-4. ブラウザで表示
+---
+## ブランチ & コミット
+初心者向けに超シンプル運用:
+1. 作業前に `develop` を最新に
+2. `自分の名前/feat-〇〇` などでブランチ作成
+3. コミットメッセージ形式: `<type>: 説明`
 
-- http://localhost:5173/
+`type` 一覧: `feat` / `fix` / `docs` / `refactor` / `chore` / `test` だけ覚えれば OK。詳しくは `CONTRIBUTING.md`。
 
-停止はターミナルで Ctrl+C。
+例:
+```
+tarou/feat-presence
+feat: add presence placeholder
+```
 
-### セットアップ
-1. 依存関係をインストール
-	- すでに `node_modules` が無い場合は自動でインストールしてください。
-2. 開発サーバーを起動
-	- `npm run dev`
-3. ブラウザでアクセス
-	- http://localhost:5173/
+---
+## .env 作成例
+```
+APP_ENV=development
+DEBUG=1
+LOG_LEVEL=INFO
+CORS_ORIGINS=http://localhost:5173
+```
 
-### スクリプト
-- `npm run dev` 開発サーバー起動
-- `npm run build` 本番ビルド
-- `npm run preview` ビルド結果のプレビュー
+---
+## よくあるミス
+| 症状 | 対処 |
+|------|------|
+| `ModuleNotFoundError` | venv 有効化できてるか確認 / 再インストール |
+| `pip` 遅い | `python -m pip install -r requirements.txt` を再試行 |
+| フロント CORS エラー | `.env` の `CORS_ORIGINS` が合ってるか |
+| Socket 繋がらない | バックエンドを 5000 番で起動しているか |
 
-### 主なファイル
-- `index.html` ルート HTML
-- `src/main.tsx` React エントリ
-- `src/App.tsx` React Three Fiber のサンプル
+---
+## 次やりたい（メモ）
+- Firebase 認証
+- Presence 更新ロジック
+- Firestore モデル
+- Gemini 連携
 
-### 画面
-- 画面には回転する立方体が表示され、ドラッグでカメラを回転（OrbitControls）が可能です。
+深い設計は慣れてから別ドキュメント化予定。
+
+---
+## ライセンス
+TBD
+

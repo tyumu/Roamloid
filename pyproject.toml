@@ -1,0 +1,27 @@
+[project]
+name = "roamloid-backend"
+version = "0.0.0"
+description = "Roamloid backend skeleton"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E203", "E501"]
+
+[tool.ruff.isort]
+combine-as-imports = true
+
+[tool.mypy]
+python_version = 3.11
+warn_unused_configs = true
+warn_return_any = true
+warn_unreachable = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+strict_optional = true
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
