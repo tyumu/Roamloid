@@ -1,91 +1,113 @@
 # Roamloid
 
-1 体の 3D キャラが複数端末に“存在”している感を出すリアルタイム Web アプリ（学習用プロトタイプ）。
+「1 体の 3D キャラが“端末をまたいで存在している感”を出す」ことをゴールにした学習用プロジェクト。リアルタイム通信 / 認証 / 3D / AI の練習土台。
 
 ---
-## 今できること（最小）
-- `GET /api/health` でサーバー生存確認
-- `GET /api/hello` サンプルレスポンス
-- SocketIO 接続で `system` メッセージ受信
+## このリポジトリでやりたいこと（用途）
+| 用途 | 目的 | 今の状態 |
+|------|------|----------|
+| リアルタイム接続 | SocketIO で接続/切断検知し状態共有 | 接続イベントのみ実装済み |
+| 認証基盤 | Firebase でユーザー識別 | まだ未接続（下準備のみ） |
+| アバター表現 | React Three Fiber で 3D 描画 | 回転する箱のプレースホルダ |
+| 会話/生成 | Gemini API を使った発話生成 | 未着手 |
+| Presence | 「今どこに居るか」記録と更新 | 未着手 |
+| 学習教材 | 初心者が少しずつ触れる構成 | シンプル README & ルール整備済み |
 
 ---
-## 5 分クイックスタート
+## まず触ってみる（5 分）
+1. Backend 起動 → `/api/health` が 200 になるか
+2. Frontend 起動 → 3D の箱が回って表示されるか
+3. ブラウザ DevTools -> Network で `/api/hello` のレスポンスを確認
 
-### 1. Backend 起動
-前提: Python 3.11+
+### Backend 起動 (Python 3.11+)
 ```powershell
 cd backend
 python -m venv .venv
 . .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-copy ..\..\.env.example .env  # 失敗したら手動で .env 作成
-python run.py   # → http://localhost:5000/api/health
+copy ..\..\.env.example .env  # 失敗したら手動コピー
+python run.py  # http://localhost:5000/api/health
 ```
 
-### 2. Frontend 起動
-前提: Node.js 18+ (20 推奨)
+### Frontend 起動 (Node 18+)
 ```powershell
 npm install
-npm run dev   # → http://localhost:5173/
+npm run dev  # http://localhost:5173/
 ```
-
-両方起動したら: ブラウザを開き、開発しつつ `api/health` が 200 になるのを確認。
 
 ---
-## フォルダざっくり
+## 今できること（API / Realtime 最小）
+| 種別 | パス / イベント | 内容 |
+|------|-----------------|------|
+| HTTP | GET /api/health | サーバー生存確認 |
+| HTTP | GET /api/hello  | サンプル JSON |
+| WS   | connect         | 接続時 `system` メッセージ |
+
+---
+## ディレクトリ概要
 ```
-backend/        ← Flask + SocketIO
+backend/
 	app/
-		routes/     ← /api/*
-		realtime/   ← WebSocket イベント
-		services/   ← Firebase など後で
-src/            ← React + Vite + (将来 3D)
-tests/          ← 簡単な Python テスト
-.env.example    ← 環境変数サンプル
-CONTRIBUTING.md ← ブランチ & コミットルール
+		routes/      # HTTP エンドポイント
+		realtime/    # SocketIO イベント
+		services/    # Firebase など外部連携予定
+src/             # React + Vite + 3D
+tests/           # Python テスト
+CONTRIBUTING.md  # ブランチ & コミット簡易ルール
+.env.example     # 環境変数サンプル
 ```
 
 ---
-## ブランチ & コミット
-初心者向けに超シンプル運用:
-1. 作業前に `develop` を最新に
-2. `自分の名前/feat-〇〇` などでブランチ作成
-3. コミットメッセージ形式: `<type>: 説明`
+## 開発の基本フロー
+1. `develop` を更新
+2. `名前/feat-xxx` でブランチを作る
+3. 少し書いて `feat: 〜` などでコミット
+4. PR を `develop` に出す
 
-`type` 一覧: `feat` / `fix` / `docs` / `refactor` / `chore` / `test` だけ覚えれば OK。詳しくは `CONTRIBUTING.md`。
-
-例:
+コミット書き方（最低限）:
 ```
-tarou/feat-presence
-feat: add presence placeholder
+feat: add health endpoint
+fix: prevent duplicate socket event
+docs: update readme for setup
 ```
+詳しくは `CONTRIBUTING.md`。
 
 ---
-## .env 作成例
+## .env 作成例（開発）
 ```
 APP_ENV=development
 DEBUG=1
 LOG_LEVEL=INFO
 CORS_ORIGINS=http://localhost:5173
+# FIREBASE_CREDENTIALS_JSON={"type":"service_account", ...}
 ```
 
 ---
-## よくあるミス
-| 症状 | 対処 |
-|------|------|
-| `ModuleNotFoundError` | venv 有効化できてるか確認 / 再インストール |
-| `pip` 遅い | `python -m pip install -r requirements.txt` を再試行 |
-| フロント CORS エラー | `.env` の `CORS_ORIGINS` が合ってるか |
-| Socket 繋がらない | バックエンドを 5000 番で起動しているか |
+## よくあるトラブルと対処
+| 症状 | ヒント |
+|------|--------|
+| ImportError / ModuleNotFoundError | venv 有効化したか / `pip install -r requirements.txt` 済みか |
+| CORS エラー | `.env` の CORS_ORIGINS が合っているか |
+| 500 エラー | ターミナルのスタックトレースを読む / 変更直前を戻す |
+| ポート競合 | 既に他プロセスが 5000 or 5173 を使用していないか |
 
 ---
-## 次やりたい（メモ）
-- Firebase 認証
-- Presence 更新ロジック
-- Firestore モデル
-- Gemini 連携
+## 次のステップ（段階的）
+1. Firebase クライアント SDK 導入 → 匿名ログイン → token をヘッダに付ける
+2. Backend に `/api/me` 追加（token をデコードして uid 返す）
+3. Presence: 接続/切断で Firestore に状態保存
+4. Gemini: テキスト生成を SocketIO でストリーム送信
+5. アバター: 生成テキスト → 表情 / 動き へ反映
 
-深い設計は慣れてから別ドキュメント化予定。
+焦らず「動く最小」→「拡張」の順に進める。
+
+---
+## 参加するときの考え方
+| 状態 | どうする | 目的 |
+|------|----------|------|
+| 何を触ればいいかわからない | README の「次のステップ」から 1 つ選ぶ | 学習の迷子防止 |
+| 変更が大きくなりそう | 先に小さく分割して 2 PR に | レビューしやすく |
+| 詰まった | 失敗手順をメモして共有 | 再発防止 |
 
 ---
 ## ライセンス
