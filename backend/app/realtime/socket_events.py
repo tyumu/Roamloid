@@ -1,14 +1,20 @@
 from __future__ import annotations
 from flask_socketio import emit
-from .. import socketio
 
-# Basic connection events (placeholder for presence / conversation logic)
+# Import will be resolved when this module is imported
+socketio = None
 
-@socketio.on('connect')
-def on_connect():
-    emit('system', {'message': 'connected'})
+def init_socket_events(socketio_instance):
+    """Initialize socket events with the socketio instance."""
+    global socketio
+    socketio = socketio_instance
+    
+    # Register event handlers
+    @socketio.on('connect')
+    def on_connect():
+        emit('system', {'message': 'connected'})
 
-@socketio.on('disconnect')
-def on_disconnect():
-    # No emit needed; just placeholder
-    pass
+    @socketio.on('disconnect')
+    def on_disconnect():
+        # No emit needed; just placeholder
+        pass

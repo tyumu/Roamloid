@@ -5,7 +5,6 @@ from .routes.api import api_bp
 from .routes.health import health_bp
 from .config.settings import load_settings
 from .services.firebase import init_firebase
-from .realtime import socket_events  # noqa: F401 (register handlers)
 from .errors import register_error_handlers
 
 socketio = SocketIO(cors_allowed_origins="*")
@@ -21,6 +20,10 @@ def create_app() -> Flask:
     # Extensions
     CORS(app, resources={r"/api/*": {"origins": settings.cors_origins}})
     socketio.init_app(app)
+
+    # Initialize socket events after socketio is configured
+    from .realtime.socket_events import init_socket_events
+    init_socket_events(socketio)
 
     # Services initialization (lazy where possible)
     init_firebase(settings)
