@@ -31,8 +31,10 @@ def create_app() -> Flask:
 
     # Error handlers & logging
     register_error_handlers(app)
-
     _configure_logging(settings)
+
+    # SocketIO handlers (遅延登録)
+    socket_events.ensure_registered()
 
     return app
 
