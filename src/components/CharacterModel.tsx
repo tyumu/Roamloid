@@ -1,55 +1,111 @@
-import React, { useEffect, useRef } from 'react'
-import { useGLTF, useAnimations } from '@react-three/drei'
-import { Group } from 'three'
+import React, { useEffect, useMemo, useRef } from 'react'
+import { useFrame, useLoader } from '@react-three/fiber'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { AnimationClip, AnimationMixer, Group, LoopRepeat } from 'three'
+import { Clone } from '@react-three/drei'
 
-/*
-使い方例:
-  <CharacterModel
-    path="/models/character/character.gltf"  // public/models/ 以下に配置した glTF
-    scale={1}
-    onLoaded={(clips) => console.log('読み込んだアニメーションクリップ', clips.map(c => c.name))}
-  />
-
-アセットは public/models/... 配下に置くと、ビルド無しで /models/... のパスで参照できます。
-*/
-
-export interface CharacterModelProps {
+type CharacterModelProps = {
+  /** ベースモデル(GLB) のパス */
   path: string
-  scale?: number
-  /** 初期再生したいアニメーションクリップ名。省略時は最初のクリップ */
+  /** 追加アニメーションGLBのパス（アニメーションのみ入ったGLB想定） */
+  animationPaths?: string[]
+  /** 初期再生する AnimationClip 名 */
   initialAnimation?: string
-  onLoaded?: (clips: { name: string }[]) => void
+  /** スケール */
+  scale?: number
+  /** 読み込み完了後に利用可能な AnimationClips を返す */
+  onLoaded?: (clips: AnimationClip[]) => void
 }
 
+/**
+ * ベースモデル + 外部 GLB からアニメーションクリップを統合して再生するコンポーネント。
+ * - base glb の scene を Clone し、AnimationMixer で管理
+ * - animationPaths で与えた glb の animations を統合
+ */
 export const CharacterModel: React.FC<CharacterModelProps> = ({
   path,
-  scale = 1,
+  animationPaths = [],
   initialAnimation,
-  onLoaded
+  scale = 1,
+  onLoaded,
 }) => {
-  const group = useRef<Group>(null!)
-  // useGLTF は内部でキャッシュされる
-  const gltf = useGLTF(path)
-  const { actions, clips, mixer } = useAnimations(gltf.animations, group)
+  // ベース GLB
+  const baseGltf = useLoader(GLTFLoader, path)
+  // 追加アニメ GLB 群
+  const extraGltfs = useLoader(GLTFLoader, animationPaths.length ? animationPaths : ['']) as any
 
-  // 最初（または指定された）のアニメーションを再生
+  // useLoader で空文字を読ませるとエラーになるのでガード
+  const extras: { animations: AnimationClip[] }[] = Array.isArray(extraGltfs)
+    ? extraGltfs.filter(g => g && g.animations)
+    : animationPaths.length
+      ? [extraGltfs]
+      : []
+
+  const allAnimations: AnimationClip[] = useMemo(() => {
+    const arr: AnimationClip[] = []
+    if (baseGltf.animations) arr.push(...baseGltf.animations)
+    extras.forEach(g => arr.push(...g.animations))
+    // 名前重複対策: 同名があれば後勝ちにせず suffix を付与
+    const nameCount: Record<string, number> = {}
+    arr.forEach(clip => {
+      if (!nameCount[clip.name]) {
+        nameCount[clip.name] = 1
+      } else {
+        nameCount[clip.name] += 1
+        clip.name = `${clip.name} (${nameCount[clip.name]})`
+      }
+    })
+    return arr
+  }, [baseGltf.animations, extras])
+
+  const rootRef = useRef<Group>(null)
+  const cloneGroupRef = useRef<Group>(null)
+  const mixerRef = useRef<AnimationMixer | null>(null)
+  const activeActionRef = useRef<ReturnType<AnimationMixer['clipAction']> | null>(null)
+
+  // 初回セットアップ
   useEffect(() => {
-    if (!clips.length) return
-    const targetName =
-      initialAnimation && clips.find(c => c.name === initialAnimation)
-        ? initialAnimation
-        : clips[0].name
-    const action = actions[targetName]
-    if (action) {
-      action.reset().fadeIn(0.3).play()
-    }
-    onLoaded?.(clips.map(c => ({ name: c.name })))
-    return () => {
-      if (action) action.fadeOut(0.2)
-    }
-  }, [actions, clips, initialAnimation, onLoaded])
+  const target = cloneGroupRef.current ?? rootRef.current
+  if (!target) return
+  mixerRef.current = new AnimationMixer(target)
+    if (onLoaded) onLoaded(allAnimations)
+  }, [allAnimations, onLoaded])
 
-  return <primitive ref={group} object={gltf.scene} scale={scale} />
+  // 初期アニメーション再生
+  useEffect(() => {
+    if (!initialAnimation || !mixerRef.current) return
+    const clip = allAnimations.find(c => c.name === initialAnimation) || allAnimations[0]
+    if (!clip) return
+    const action = mixerRef.current.clipAction(clip)
+    action.reset().setLoop(LoopRepeat, Infinity).play()
+    activeActionRef.current = action
+  }, [initialAnimation, allAnimations])
+
+  // 毎フレーム更新
+  useFrame((_, delta) => {
+    mixerRef.current?.update(delta)
+  })
+
+  return (
+    <group ref={rootRef} scale={scale}>
+      {/* Clone のみ描画 (元 primitive を二重に表示しない) */}
+      <Clone ref={cloneGroupRef as any} object={baseGltf.scene} />
+    </group>
+  )
 }
 
-// 必要に応じて利用側で preload する: useGLTF.preload('/models/character/hatunemini!.gltf')
+// 追加: 後からアニメ切り替えたい場合に使えるヘルパー (必要なら import して使用)
+export function playAnimation(
+  mixer: AnimationMixer | null,
+  clips: AnimationClip[],
+  name: string,
+  fadeDuration = 0.3
+) {
+  if (!mixer) return
+  const clip = clips.find(c => c.name === name)
+  if (!clip) return
+  const action = mixer.clipAction(clip)
+  // 既存アクションを全停止 (Three.js には公開 API で全取得する手段がないので同名呼び出し前提)
+  // 切替時はシンプルに reset/play
+  action.reset().play()
+}

@@ -1,22 +1,7 @@
-import React, { Suspense, useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import React, { Suspense } from 'react'
+import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-
-function SpinningBox() {
-  const ref = useRef<any>(null)
-  useFrame((_, delta) => {
-    if (ref.current) {
-      ref.current.rotation.x += delta * 0.6
-      ref.current.rotation.y += delta * 0.8
-    }
-  })
-  return (
-    <mesh ref={ref} castShadow receiveShadow>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="#4cc9f0" />
-    </mesh>
-  )
-}
+import { CharacterModel } from './components'
 
 export default function App() {
   return (
@@ -39,7 +24,16 @@ export default function App() {
         </mesh>
 
         <Suspense fallback={null}>
-          <SpinningBox />
+          {/* animationPaths にアニメだけGLB、initialAnimation にクリップ名を指定 */}
+          <CharacterModel
+            path="/models/character/hatunemini!.glb"
+            scale={1}
+            animationPaths={["/models/character/animation-jump.glb"]}
+            initialAnimation="Standing Jump"
+            onLoaded={(clips) => {
+              console.log('アニメーションクリップ名:', clips.map(c => c.name))
+            }}
+          />
         </Suspense>
 
         <OrbitControls enableDamping makeDefault />
