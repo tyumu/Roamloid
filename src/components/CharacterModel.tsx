@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useCallback } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { AnimationClip, AnimationMixer, Group, LoopRepeat } from 'three'
+import { AnimationClip, AnimationMixer, Group, LoopRepeat, LoopOnce, AnimationAction } from 'three'
 import { Clone } from '@react-three/drei'
+
 
 type CharacterModelProps = {
   /** ベースモデル(GLB) のパス */
@@ -86,26 +87,47 @@ export const CharacterModel: React.FC<CharacterModelProps> = ({
     mixerRef.current?.update(delta)
   })
 
+  const handlePointerDown = useCallback(() => {
+    playAnimation(mixerRef.current, allAnimations, 'Standing Jump', {
+      loop: LoopRepeat,
+      repetitions: Infinity,
+    })
+  }, [allAnimations])
+
   return (
-    <group ref={rootRef} scale={scale}>
-      {/* Clone のみ描画 (元 primitive を二重に表示しない) */}
+    <group ref={rootRef} scale={scale} onPointerDown={handlePointerDown}>
       <Clone ref={cloneGroupRef as any} object={baseGltf.scene} />
     </group>
   )
 }
-
-// 追加: 後からアニメ切り替えたい場合に使えるヘルパー (必要なら import して使用)
+type PlayAnimationOptions = {
+  fadeDuration?: number
+  loop?: Parameters<AnimationAction['setLoop']>[0]
+  repetitions?: number
+  clampWhenFinished?: boolean
+}
 export function playAnimation(
   mixer: AnimationMixer | null,
   clips: AnimationClip[],
   name: string,
-  fadeDuration = 0.3
+  options: PlayAnimationOptions = {}
 ) {
-  if (!mixer) return
+  if (!mixer) return null
   const clip = clips.find(c => c.name === name)
-  if (!clip) return
+  if (!clip) return null
+
+  const {
+    fadeDuration = 0.3,
+    loop = LoopRepeat,
+    repetitions = Infinity,
+    clampWhenFinished = false,
+  } = options
+
+  mixer.stopAllAction()
   const action = mixer.clipAction(clip)
-  // 既存アクションを全停止 (Three.js には公開 API で全取得する手段がないので同名呼び出し前提)
-  // 切替時はシンプルに reset/play
-  action.reset().play()
+  action.reset().setLoop(loop, repetitions)
+  action.clampWhenFinished = clampWhenFinished
+  if (fadeDuration > 0) action.fadeIn(fadeDuration)
+  action.play()
+  return action
 }

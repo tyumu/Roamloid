@@ -28,8 +28,8 @@ export default function App() {
           <CharacterModel
             path="/models/character/hatunemini!.glb"
             scale={1}
-            animationPaths={["/models/character/animation-jump.glb"]}
-            initialAnimation="Standing Jump"
+            animationPaths={["/models/character/animation-run.glb", "/models/character/animation-jump.glb"]}
+            initialAnimation="アクション"
             onLoaded={(clips) => {
               console.log('アニメーションクリップ名:', clips.map(c => c.name))
             }}
