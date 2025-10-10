@@ -1,9 +1,26 @@
-import React, { useEffect, useMemo, useRef, useCallback } from 'react'
+import React, { useEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { AnimationClip, AnimationMixer, Group, LoopRepeat, LoopOnce, AnimationAction } from 'three'
-import { Clone } from '@react-three/drei'
+import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 
+//aisamples.tsxの文字列を順番に通知していく
+import { aiSamples } from './aisamples'
+export type AIMockHandle = { stop: () => void }
+
+export function startAIMock(onText: (text: string) => void, interval = 2500, loop = true): AIMockHandle {
+  let i = 0
+  const id = setInterval(() => {
+    onText(aiSamples[i])
+    i += 1
+    if (i >= aiSamples.length) {
+      if (loop) i = 0
+      else clearInterval(id)
+    }
+  }, interval)
+  console.log('AIモック開始')
+  return { stop: () => clearInterval(id) }
+}
 
 type CharacterModelProps = {
   /** ベースモデル(GLB) のパス */
@@ -16,38 +33,43 @@ type CharacterModelProps = {
   scale?: number
   /** 読み込み完了後に利用可能な AnimationClips を返す */
   onLoaded?: (clips: AnimationClip[]) => void
+  /** 外部から再生指示されたクリップ名 */
+  requestedAnimation?: string
+  /** 読み込み完了時にクリップ名をコンソールに出力するか */
+  logClipsOnLoad?: boolean
 }
 
-/**
- * ベースモデル + 外部 GLB からアニメーションクリップを統合して再生するコンポーネント。
- * - base glb の scene を Clone し、AnimationMixer で管理
- * - animationPaths で与えた glb の animations を統合
- */
 export const CharacterModel: React.FC<CharacterModelProps> = ({
   path,
   animationPaths = [],
   initialAnimation,
   scale = 1,
   onLoaded,
+  requestedAnimation,
+  logClipsOnLoad = false,
 }) => {
   // ベース GLB
   const baseGltf = useLoader(GLTFLoader, path)
   // 追加アニメ GLB 群
-  const extraGltfs = useLoader(GLTFLoader, animationPaths.length ? animationPaths : ['']) as any
+  const extraGltfs = useLoader(GLTFLoader, animationPaths) as any[]
 
-  // useLoader で空文字を読ませるとエラーになるのでガード
-  const extras: { animations: AnimationClip[] }[] = Array.isArray(extraGltfs)
-    ? extraGltfs.filter(g => g && g.animations)
-    : animationPaths.length
-      ? [extraGltfs]
+  // 複製したシーンを保持
+  const clonedSceneRef = useRef<Group | null>(null)
+
+  // extras を安定化
+  const stableExtras = useMemo(() => {
+    return Array.isArray(extraGltfs)
+      ? extraGltfs.filter(g => g && g.animations)
       : []
+  }, [extraGltfs])
 
   const allAnimations: AnimationClip[] = useMemo(() => {
     const arr: AnimationClip[] = []
     if (baseGltf.animations) arr.push(...baseGltf.animations)
-    extras.forEach(g => arr.push(...g.animations))
-    // 名前重複対策: 同名があれば後勝ちにせず suffix を付与
+    stableExtras.forEach(g => arr.push(...g.animations))
+    
     const nameCount: Record<string, number> = {}
+    // 名前の重複を避けるため、同じ名前があれば (2), (3) ... を付与する
     arr.forEach(clip => {
       if (!nameCount[clip.name]) {
         nameCount[clip.name] = 1
@@ -57,47 +79,90 @@ export const CharacterModel: React.FC<CharacterModelProps> = ({
       }
     })
     return arr
-  }, [baseGltf.animations, extras])
+  }, [baseGltf.animations, stableExtras])
 
   const rootRef = useRef<Group>(null)
-  const cloneGroupRef = useRef<Group>(null)
   const mixerRef = useRef<AnimationMixer | null>(null)
   const activeActionRef = useRef<ReturnType<AnimationMixer['clipAction']> | null>(null)
+  const currentClipNameRef = useRef<string | null>(null)
 
-  // 初回セットアップ
+  // シーンの複製とmixerの初期化
   useEffect(() => {
-  const target = cloneGroupRef.current ?? rootRef.current
-  if (!target) return
-  mixerRef.current = new AnimationMixer(target)
-    if (onLoaded) onLoaded(allAnimations)
-  }, [allAnimations, onLoaded])
+    if (!baseGltf.scene) return
 
-  // 初期アニメーション再生
+    // SkeletonUtilsでシーンを複製
+    const clonedScene = clone(baseGltf.scene) as Group
+    clonedSceneRef.current = clonedScene
+
+    // rootRefに追加
+    if (rootRef.current) {
+      rootRef.current.clear()
+      rootRef.current.add(clonedScene)
+    }
+
+    // AnimationMixerを初期化
+    if (allAnimations.length > 0) {
+      const mixer = new AnimationMixer(clonedScene)
+      mixerRef.current = mixer
+
+      if (logClipsOnLoad) {
+        console.log('Available clips:', allAnimations.map(c => c.name))
+      }
+      onLoaded?.(allAnimations)
+
+      // 初期アニメーションを再生
+      if (initialAnimation) {
+        const action = playAnimation(mixer, allAnimations, initialAnimation)
+        if (action) {
+          activeActionRef.current = action
+          currentClipNameRef.current = initialAnimation
+        }
+      }
+    }
+
+    return () => {
+      if (mixerRef.current) {
+        mixerRef.current.stopAllAction()
+      }
+    }
+  }, [baseGltf.scene, allAnimations, initialAnimation, onLoaded, logClipsOnLoad])
+
+  // requestedAnimationの変更でアニメーション切り替え
   useEffect(() => {
-    if (!initialAnimation || !mixerRef.current) return
-    const clip = allAnimations.find(c => c.name === initialAnimation) || allAnimations[0]
-    if (!clip) return
-    const action = mixerRef.current.clipAction(clip)
-    action.reset().setLoop(LoopRepeat, Infinity).play()
-    activeActionRef.current = action
-  }, [initialAnimation, allAnimations])
+    if (mixerRef.current && requestedAnimation && requestedAnimation !== currentClipNameRef.current) {
+      const newAction = playAnimation(mixerRef.current, allAnimations, requestedAnimation, {
+        prevAction: activeActionRef.current,
+        crossFade: true,
+      })
+      if (newAction) {
+        activeActionRef.current = newAction
+        currentClipNameRef.current = requestedAnimation
+      }
+    }
+  }, [requestedAnimation, allAnimations])
 
-  // 毎フレーム更新
-  useFrame((_, delta) => {
-    mixerRef.current?.update(delta)
+  // mixerの更新
+  useFrame((state, delta) => {
+    if (mixerRef.current) mixerRef.current.update(delta)
   })
 
   const handlePointerDown = useCallback(() => {
-    playAnimation(mixerRef.current, allAnimations, 'Standing Jump', {
+    const newAction = playAnimation(mixerRef.current, allAnimations, 'Standing Jump', {
       loop: LoopRepeat,
       repetitions: Infinity,
+      fadeDuration: 0.3,
+      prevAction: activeActionRef.current,
+      crossFade: true,
     })
+    if (newAction) {
+      activeActionRef.current = newAction
+      currentClipNameRef.current = 'Standing Jump'
+    }
+    console.log('クリックで Standing Jump')
   }, [allAnimations])
 
   return (
-    <group ref={rootRef} scale={scale} onPointerDown={handlePointerDown}>
-      <Clone ref={cloneGroupRef as any} object={baseGltf.scene} />
-    </group>
+    <group ref={rootRef} scale={scale} onPointerDown={handlePointerDown} />
   )
 }
 type PlayAnimationOptions = {
@@ -105,6 +170,10 @@ type PlayAnimationOptions = {
   loop?: Parameters<AnimationAction['setLoop']>[0]
   repetitions?: number
   clampWhenFinished?: boolean
+  /** 直前のアクション（クロスフェード用） */
+  prevAction?: AnimationAction | null
+  /** crossFadeFrom を使うか（true 推奨） */
+  crossFade?: boolean
 }
 export function playAnimation(
   mixer: AnimationMixer | null,
@@ -112,22 +181,65 @@ export function playAnimation(
   name: string,
   options: PlayAnimationOptions = {}
 ) {
-  if (!mixer) return null
+  if (!mixer) {
+    console.warn('Mixer is not initialized')
+    return null
+  }
+  
   const clip = clips.find(c => c.name === name)
-  if (!clip) return null
+  if (!clip) {
+    console.warn(`Animation clip "${name}" not found. Available clips:`, clips.map(c => c.name))
+    return null
+  }
 
   const {
     fadeDuration = 0.3,
     loop = LoopRepeat,
     repetitions = Infinity,
     clampWhenFinished = false,
+    prevAction = null,
+    crossFade = true,
   } = options
 
-  mixer.stopAllAction()
   const action = mixer.clipAction(clip)
-  action.reset().setLoop(loop, repetitions)
+  
+  // 1. アクションをリセット（前の再生状態をクリア）
+  action.reset()
+  
+  // 2. ループ設定を適用
+  action.setLoop(loop, repetitions)
   action.clampWhenFinished = clampWhenFinished
-  if (fadeDuration > 0) action.fadeIn(fadeDuration)
-  action.play()
+  
+  // 3. weight を明示的に設定（初期化）
+  action.enabled = true
+  action.setEffectiveTimeScale(1)
+  action.setEffectiveWeight(1)
+
+  // 4. 前のアクションとの切り替え処理
+  if (prevAction && prevAction !== action) {
+    // 同じアクションでないことを確認済み
+    if (crossFade) {
+      // クロスフェード（推奨）: スムーズに切り替わる
+      prevAction.enabled = true // 確実に有効化
+      action.enabled = true
+      action.setEffectiveWeight(1)
+      action.crossFadeFrom(prevAction, fadeDuration, true) // warp=true で前のアクションを自動停止
+      action.play()
+    } else {
+      // 手動フェード: より細かい制御が可能
+      prevAction.fadeOut(fadeDuration)
+      action.fadeIn(fadeDuration).play()
+    }
+  } else {
+    // 5. 初回 or 同一アクション
+    if (fadeDuration > 0 && action.weight === 0) {
+      // weightが0の場合のみフェードイン
+      action.fadeIn(fadeDuration)
+    }
+    action.play()
+  }
+  
+  console.log(`Playing animation: "${name}" (loop: ${loop === LoopRepeat ? 'repeat' : 'once'})`)
+  
   return action
 }

@@ -1,9 +1,32 @@
-import React, { Suspense } from 'react'
+import React, { Suspense, useEffect, useMemo, useState, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { CharacterModel } from './components'
+import { CharacterModel, startAIMock } from './components/CharacterModel'
+import type { AnimationClip } from 'three'
 
 export default function App() {
+  const [clipNames, setClipNames] = useState<string[]>([])
+  const [requestedAnimation, setRequestedAnimation] = useState<string | undefined>(undefined)
+
+    // クリップ名が揃ったらモックを開始
+  useEffect(() => {
+    if (clipNames.length === 0) return
+    const handle = startAIMock((text) => {
+      // 成型なし：完全一致のみ採用（合わなければ何もしない or 先頭にしたい場合は clipNames[0] を設定）
+      if (clipNames.includes(text)) {
+        setRequestedAnimation(text)
+      }
+    }, 2500, true)
+    return () => handle.stop()
+  }, [clipNames])
+
+  const initialAnimation = useMemo(() => clipNames[0] ?? undefined, [clipNames])
+
+    const handleLoaded = useCallback((clips: AnimationClip[]) => {
+    const names = clips.map(c => c.name)
+    setClipNames(prev => (JSON.stringify(prev) === JSON.stringify(names) ? prev : names))
+  }, [])
+
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <Canvas shadows camera={{ position: [3, 3, 3], fov: 60 }}>
@@ -24,15 +47,17 @@ export default function App() {
         </mesh>
 
         <Suspense fallback={null}>
-          {/* animationPaths にアニメだけGLB、initialAnimation にクリップ名を指定 */}
           <CharacterModel
             path="/models/character/hatunemini!.glb"
             scale={1}
-            animationPaths={["/models/character/animation-run.glb", "/models/character/animation-jump.glb"]}
-            initialAnimation="アクション"
-            onLoaded={(clips) => {
-              console.log('アニメーションクリップ名:', clips.map(c => c.name))
-            }}
+            animationPaths={[
+              "/models/character/animation-run.glb",
+              "/models/character/animation-jump.glb"
+            ]}
+            initialAnimation={initialAnimation}
+            requestedAnimation={requestedAnimation}
+            onLoaded={handleLoaded}
+            logClipsOnLoad={true}
           />
         </Suspense>
 
