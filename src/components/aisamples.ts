@@ -1,5 +1,5 @@
 export const aiSamples = [
-  'アクション',
-  'Standing Jump',
-  '不明コマンド'
+  'こんにちは！',
+  'ジャンプするよ！　command:Standing Jump',
+  '手を振るよ！　command:アクション',
 ]

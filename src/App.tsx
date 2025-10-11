@@ -7,28 +7,42 @@ import type { AnimationClip } from 'three'
 export default function App() {
   const [clipNames, setClipNames] = useState<string[]>([])
   const [requestedAnimation, setRequestedAnimation] = useState<string | undefined>(undefined)
-
+  const [displayText, setdisplayText] = useState<string>('')
     // クリップ名が揃ったらモックを開始
   useEffect(() => {
     if (clipNames.length === 0) return
     const handle = startAIMock((text) => {
-      // 成型なし：完全一致のみ採用（合わなければ何もしない or 先頭にしたい場合は clipNames[0] を設定）
+      const commandIndex = text.indexOf('command:')
+      console.log("受信テキスト：" + text)
+      if (commandIndex !== -1) {
+        const displayText = text.substring(0, commandIndex).trim()// 表示用テキスト
+        const commandText = text.substring(commandIndex + 8).trim()// command:以降のテキスト
+        setdisplayText(displayText)
+        setRequestedAnimation(commandText)
+        console.log("コマンド認識：" + commandText)
+      } else {
+        setdisplayText(text)
+      }
       if (clipNames.includes(text)) {
         setRequestedAnimation(text)
       }
-    }, 2500, true)
+    }, 5000, true)
     return () => handle.stop()
   }, [clipNames])
 
   const initialAnimation = useMemo(() => clipNames[0] ?? undefined, [clipNames])
 
-    const handleLoaded = useCallback((clips: AnimationClip[]) => {
-    const names = clips.map(c => c.name)
-    setClipNames(prev => (JSON.stringify(prev) === JSON.stringify(names) ? prev : names))
+  const handleLoaded = useCallback((clips: AnimationClip[]) => {
+  const names = clips.map(c => c.name)
+  setClipNames(prev => (JSON.stringify(prev) === JSON.stringify(names) ? prev : names))
   }, [])
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
+      {/*テキスト表示エリア*/}
+      <div style={{ position: 'absolute', top: 20, left: 20, color: 'white', zIndex: 1, backgroundColor: 'rgba(0,0,0,0.5)', padding: '10px', borderRadius: '5px' }}>
+        <p>{displayText}</p>
+      </div>
       <Canvas shadows camera={{ position: [3, 3, 3], fov: 60 }}>
         {/* Lights */}
         <ambientLight intensity={0.4} />
