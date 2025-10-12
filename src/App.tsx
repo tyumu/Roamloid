@@ -5,6 +5,7 @@ import { CharacterModel, startAIMock } from './components/CharacterModel'
 import type { AnimationClip, Group } from 'three'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
+import { useNavigate } from 'react-router-dom'
 
 // 浮遊するオブジェクトコンポーネント
 function FloatingObjects() {
@@ -162,9 +163,31 @@ export default function App() {
   setClipNames(prev => (JSON.stringify(prev) === JSON.stringify(names) ? prev : names))
   }, [])
 
+  const navigate = useNavigate();
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
-      {/*テキスト表示エリア*/}
+      {/*デバック用メニュー*/}
+      <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1 }}>
+        <select onChange={(e) => { 
+          const value = e.target.value;
+          if (value === 'loginページへ') {
+            // ログインページへの遷移処理
+            navigate('/login');
+          } else if (clipNames.includes(value)) {
+            // アニメーションの場合の処理
+            setRequestedAnimation(value);
+            console.log("手動選択：" + value);
+          }
+        }}>
+          <option value="" disabled selected>-- デバック用メニュー --</option>
+          {clipNames.map(name => (
+            <option key={name} value={name}>{"アニメーション：" + name}</option>
+          ))}
+          {/* 追加のオプション例: ログインページへ */}
+          <option value="loginページへ">ログインページへ</option>
+        </select>
+      </div>
+      {/*AI(モック)テキスト表示エリア*/}
       <div style={{ position: 'absolute', top: 20, left: 20, color: 'white', zIndex: 1, backgroundColor: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '5px' }}>
         <p>{displayText}</p>
       </div>
@@ -235,4 +258,4 @@ export default function App() {
       </Canvas>
     </div>
   )
-}
+  }
