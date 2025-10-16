@@ -103,8 +103,9 @@ class DeleteUserResource(Resource):
 
     @login_required
     def delete(self):
-        if current_user:
-            db.session.delete(current_user)
+        user = current_user
+        if user:
+            db.session.delete(user)
             db.session.commit()
             logout_user()
             # return {"message": "ユーザーが正常に削除されました。"}, 200  # OK
