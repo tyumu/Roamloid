@@ -48,7 +48,7 @@ POINT:
 feat: add basic presence socket event
 fix: prevent duplicate system event on reconnect
 docs: update readme with setup steps
-refactor: extract firebase init helper
+refactor: extract init helper
 chore: add commit template file
 test: add socket connect test
 ```

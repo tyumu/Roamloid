@@ -7,7 +7,7 @@
 | 用途 | 目的 | 今の状態 |
 |------|------|----------|
 | リアルタイム接続 | SocketIO で接続/切断検知し状態共有 | 接続イベントのみ実装済み |
-| 認証基盤 | Firebase でユーザー識別 | まだ未接続（下準備のみ） |
+| 認証基盤 | ローカル DB (SQLite) + Flask-Login による認証 | 実装済み |
 | アバター表現 | React Three Fiber で 3D 描画 | 回転する箱のプレースホルダ |
 | 会話/生成 | Gemini API を使った発話生成 | 未着手 |
 | Presence | 「今どこに居るか」記録と更新 | 未着手 |
@@ -93,9 +93,9 @@ CORS_ORIGINS=http://localhost:5173
 
 ---
 ## 次のステップ（段階的）
-1. Firebase クライアント SDK 導入 → 匿名ログイン → token をヘッダに付ける
-2. Backend に `/api/me` 追加（token をデコードして uid 返す）
-3. Presence: 接続/切断で Firestore に状態保存
+1. 現状: SQLite + Flask-Login ベースの認証が実装されています（`/api/auth/*` エンドポイント）。
+2. オプション: 将来的に外部認証を導入する場合は、フロント側／サーバ側の設計を検討してください（現状は SQLite + Flask-Login で完結しています）。
+3. Presence: 接続/切断で DB に状態保存（現在は SocketIO 側で device / chat 保存が追加されています）
 4. Gemini: テキスト生成を SocketIO でストリーム送信
 5. アバター: 生成テキスト → 表情 / 動き へ反映
 
