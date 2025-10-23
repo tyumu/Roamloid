@@ -1,11 +1,287 @@
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  background: #0f0f14;
-  color: #f1f5f9;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-canvas { display: block; }
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.chat-ui {
+  flex-direction: column;
+  justify-content: flex-end;
+  background-color: rgba(0, 0, 0, 0.85);
+  padding: 20px;
+}
+
+.chat-log {
+  flex-grow: 1;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  padding-right: 10px;
+}
+
+.chat-message {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.chat-message.ai {
+  color: #81D4FA;
+}
+.chat-message.other {
+  color: #A5D6A7;
+}
+
+.chat-input-area {
+  display: flex;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.chat-input-area input {
+  flex-grow: 1;
+  padding: 10px;
+  font-size: 16px;
+  background-color: #333;
+  border: 1px solid #555;
+  color: white;
+  border-radius: 4px 0 0 4px;
+}
+.chat-input-area button {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007bff;
+  border: none;
+  color: white;
+  cursor: pointer;
+  border-radius: 0 4px 4px 0;
+  margin: 0;
+}
+
+.menu-ui .menu-content {
+  background-color: #282c34;
+  padding: 20px 40px;
+  border-radius: 8px;
+  min-width: 400px;
+  max-width: 90%;
+  text-align: left;
+  border: 1px solid #555;
+}
+
+.menu-section {
+  margin-bottom: 25px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 15px;
+}
+.menu-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 15px;
+}
+
+.menu-section h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #646cff;
+}
+
+.menu-content button {
+  padding: 10px 15px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 10px;
+  margin-top: 5px;
+  font-size: 14px;
+}
+.menu-content button:hover {
+  opacity: 0.8;
+  border-color: transparent;
+}
+.menu-content .logout-button {
+  background-color: #f44336;
+}
+.menu-content .close-button {
+  background-color: #666;
+  margin-top: 20px;
+  width: 100%;
+}
+
+/* Login hero styles (centered, large white buttons) */
+.login-root {
+  width: 100vw; /* span full viewport so content can be centered */
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1f1f1f; /* darker than :root for emphasis */
+}
+.login-panel {
+  width: 100%;
+  max-width: 720px;
+  padding: 40px 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  width: 360px;
+  max-width: 480px;
+  margin: 0 auto 40px auto;
+}
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: #ffffff;
+  color: #222222;
+  border-radius: 6px;
+  padding: 28px 20px;
+  font-size: 2rem;
+  font-weight: 600;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.6);
+  border: 1px solid rgba(0,0,0,0.25);
+  text-decoration: none;
+  cursor: pointer;
+}
+.hero-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Hide original small form when showing hero buttons on larger screens */
+.login-form { display: none; }
+
+@media (max-width: 520px) {
+  .hero-actions { width: 85%; gap: 24px; }
+  .hero-btn { font-size: 1.6rem; padding: 20px 16px; }
+}
+
+/* Register page layout */
+.register-root {
+  /* Make the register root cover the viewport and center its child
+     so it is not affected by parent two-column layouts. */
+  position: fixed;
+  inset: 0; /* top:0; right:0; bottom:0; left:0; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(31,31,31,0.95);
+  z-index: 999;
+}
+.register-card {
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  width: 640px; /* larger width for desktop */
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.register-card h2 {
+  margin-top: 0;
+  font-size: 1.6rem;
+}
+.input-full {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+  font-size: 1.05rem;
+}
+.full-button {
+  width: 100%;
+  padding: 16px;
+  font-size: 1.05rem;
+}
+
+/* responsive breakpoints */
+@media (max-width: 900px) {
+  .register-card { width: 520px; padding: 28px; }
+}
+@media (max-width: 520px) {
+  .register-card { width: 92%; padding: 20px; }
+  .input-full { padding: 10px; }
+  .full-button { padding: 12px; }
+}

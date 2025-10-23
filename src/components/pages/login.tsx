@@ -1,18 +1,54 @@
-import React from "react";
-import {Link} from "react-router-dom";
-const Login = () => {
+import React, { useState } from "react";
+import {Link, useNavigate} from "react-router-dom";
+import AuthCard from "../AuthCard";
+
+const Login: React.FC = () => {
+    const [showForm, setShowForm] = useState(false);
+    const navigate = useNavigate();
+
+    const handleHeroLoginClick = () => {
+        setShowForm(s => !s);
+    };
+
+    const apiLogin = async (values: Record<string,string>) => {
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(values),
+            credentials: 'include', // include session cookie
+        });
+        let json: any = {};
+        try {
+            json = await res.json();
+        } catch (e) {
+            // response had no JSON body
+            json = {};
+        }
+        if (res.ok) {
+            // on success, navigate to home
+            navigate('/');
+            return { ok: true };
+        }
+        return { ok: false, message: json.error_message || json.message };
+    };
+
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#f0f0f0' }}>
-            <h2>Login Page</h2>
-            <form style={{ display: 'flex', flexDirection: 'column', width: '300px' }}>
-                <label htmlFor="email">Email:</label>
-                <input type="text" id="email" placeholder="Enter your email" style={{ marginBottom: '10px', padding: '8px' }} />
-                <label htmlFor="password">Password:</label>
-                <input type="password" id="password" placeholder="Enter your password" style={{ marginBottom: '20px', padding: '8px' }} />
-                <button type="submit" style={{ padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer' }}>Login</button>
-            </form>
-            <p style={{ marginTop: '20px' }}>Don't have an account? <Link to="/register">Sign up here</Link></p>
-            <Link to="/">Go to Home</Link>
+        <div className="login-root">
+            <div className="login-panel">
+                <div className="hero-actions">
+                    <button className="hero-btn" onClick={handleHeroLoginClick}>ログイン</button>
+                    <Link to="/register" className="hero-btn">新規登録</Link>
+                </div>
+
+                {showForm && (
+                    <AuthCard
+                        title="ログイン"
+                        fields={[{ name: 'username', label: 'ユーザー名' }, { name: 'password', label: 'パスワード', type: 'password' }]}
+                        submitLabel="ログイン"
+                        onSubmit={apiLogin}
+                    />
+                )}
+            </div>
         </div>
     );
 };

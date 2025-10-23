@@ -1,261 +1,241 @@
-import React, { Suspense, useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Environment } from '@react-three/drei'
-import { CharacterModel, startAIMock } from './components/CharacterModel'
-import type { AnimationClip, Group } from 'three'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
-import * as THREE from 'three'
+// src/App.tsx
+
+import React, { Suspense, useEffect, useRef, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
+import { CharacterModel, startAIMock, AIMockHandle } from './components/CharacterModel'
 import { useNavigate } from 'react-router-dom'
+import io from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
 
-// 浮遊するオブジェクトコンポーネント
-function FloatingObjects() {
-  const torusRef = useRef<THREE.InstancedMesh>(null!)
-  const boxRef = useRef<THREE.InstancedMesh>(null!)
-  const sphereRef = useRef<THREE.InstancedMesh>(null!)
-  
-  const count = 45 // インスタンス数（3の倍数にする）
-  
-  // 各インスタンスの初期位置とアニメーションパラメータ
-  const instances = useMemo(() => {
-    return Array.from({ length: count }, (_, i) => {
-      let x, z
-      do {
-        x = (Math.random() - 0.5) * 20
-        z = (Math.random() - 0.5) * 30
-      } while (Math.sqrt(x * x + z * z) < 1.5) // 原点から半径1.5以内は避ける
-      
-      return {
-        position: new THREE.Vector3(
-          x,
-          Math.random() * 6 + 0.5,
-          z
-        ),
-        rotation: new THREE.Euler(
-          Math.random() * Math.PI,
-          Math.random() * Math.PI,
-          Math.random() * Math.PI
-        ),
-        scale: 0.6 + Math.random() * 0.8,
-        speed: 0.3 + Math.random() * 0.5,
-        rotSpeed: 0.2 + Math.random() * 0.3,
-        offset: Math.random() * Math.PI * 2
-      }
-    })
-  }, [count])
-
-  useFrame((state, delta) => {
-    const t = state.clock.getElapsedTime()
-    const tempObject = new THREE.Object3D()
-    
-    // トーラス
-    if (torusRef.current) {
-      let torusIndex = 0
-      instances.forEach((inst, i) => {
-        if (i % 3 === 0) {
-          tempObject.position.copy(inst.position)
-          tempObject.position.y += Math.sin(t * inst.speed + inst.offset) * 0.3
-          tempObject.rotation.set(
-            inst.rotation.x + t * inst.rotSpeed * 0.5,
-            inst.rotation.y + t * inst.rotSpeed,
-            inst.rotation.z
-          )
-          tempObject.scale.setScalar(inst.scale)
-          tempObject.updateMatrix()
-          torusRef.current.setMatrixAt(torusIndex, tempObject.matrix)
-          torusIndex++
-        }
-      })
-      torusRef.current.instanceMatrix.needsUpdate = true
-    }
-    
-    // ボックス
-    if (boxRef.current) {
-      let boxIndex = 0
-      instances.forEach((inst, i) => {
-        if (i % 3 === 1) {
-          tempObject.position.copy(inst.position)
-          tempObject.position.y += Math.cos(t * inst.speed + inst.offset) * 0.35
-          tempObject.rotation.set(
-            inst.rotation.x + t * inst.rotSpeed,
-            inst.rotation.y + t * inst.rotSpeed,
-            inst.rotation.z + t * inst.rotSpeed * 0.5
-          )
-          tempObject.scale.setScalar(inst.scale)
-          tempObject.updateMatrix()
-          boxRef.current.setMatrixAt(boxIndex, tempObject.matrix)
-          boxIndex++
-        }
-      })
-      boxRef.current.instanceMatrix.needsUpdate = true
-    }
-    
-    // スフィア
-    if (sphereRef.current) {
-      let sphereIndex = 0
-      instances.forEach((inst, i) => {
-        if (i % 3 === 2) {
-          tempObject.position.copy(inst.position)
-          tempObject.position.y += Math.sin(t * inst.speed * 0.8 + inst.offset) * 0.25
-          tempObject.rotation.copy(inst.rotation)
-          tempObject.scale.setScalar(inst.scale * 0.8)
-          tempObject.updateMatrix()
-          sphereRef.current.setMatrixAt(sphereIndex, tempObject.matrix)
-          sphereIndex++
-        }
-      })
-      sphereRef.current.instanceMatrix.needsUpdate = true
-    }
-  })
-
-  return (
-    <group>
-      {/* インスタンス化されたトーラス */}
-      <instancedMesh ref={torusRef} args={[undefined, undefined, count / 3]} castShadow>
-        <torusGeometry args={[0.5, 0.12, 12, 24]} />
-        <meshStandardMaterial color="#4dd0e1" emissive="#4dd0e1" emissiveIntensity={0.05} metalness={0.9} roughness={0.2} />
-      </instancedMesh>
-      
-      {/* インスタンス化されたボックス */}
-      <instancedMesh ref={boxRef} args={[undefined, undefined, count / 3]} castShadow>
-        <boxGeometry args={[0.5, 0.5, 0.5]} />
-        <meshStandardMaterial color="#b3e5fc" emissive="#4dd0e1" emissiveIntensity={0.03} metalness={0.95} roughness={0.1} />
-      </instancedMesh>
-      
-      {/* インスタンス化されたスフィア */}
-      <instancedMesh ref={sphereRef} args={[undefined, undefined, count / 3]} castShadow>
-        <sphereGeometry args={[0.3, 16, 16]} />
-        <meshStandardMaterial color="#ffffff" emissive="#4dd0e1" emissiveIntensity={0.08} metalness={0.8} roughness={0.3} />
-      </instancedMesh>
-    </group>
-  )
+type ReceiveData = {
+  device_name: string;
+  text: string;
 }
 
-export default function App() {
-  const [clipNames, setClipNames] = useState<string[]>([])
-  const [requestedAnimation, setRequestedAnimation] = useState<string | undefined>(undefined)
-  const [displayText, setdisplayText] = useState<string>('')
-    // クリップ名が揃ったらモックを開始
+// ソケットの初期化
+const socket = io('http://localhost:5000', {
+  autoConnect: false,
+  transportOptions: {
+    polling: {
+      withCredentials: true
+    },
+    websocket: {
+      withCredentials: true
+    }
+  }
+})
+
+function App() {
+  const [modelReady, setModelReady] = useState(false)
+  const [clips, setClips] = useState<string[]>([])
+  const [currentClip, setCurrentClip] = useState('Idle')
+  const [chatHistory, setChatHistory] = useState<{ sender: string, text: string }[]>([])
+  
+  // UIの表示状態を管理するState
+  const [isChatVisible, setChatVisible] = useState(false)
+  const [isMenuVisible, setMenuVisible] = useState(false)
+  
+  // 自動応答（モック）の実行状態を管理するState
+  const [isAutoChatRunning, setAutoChatRunning] = useState(true)
+  
+  // 自動応答のon/offを制御するためのRef
+  const mockHandleRef = useRef<AIMockHandle | null>(null)
+  
+  // ログアウト時の画面遷移用
+  const navigate = useNavigate()
+
+  // グローバルなキーボードイベントを監視
   useEffect(() => {
-    if (clipNames.length === 0) return
-    const handle = startAIMock((text) => {
-      const commandIndex = text.indexOf('command:')
-      console.log("受信テキスト：" + text)
-      if (commandIndex !== -1) {
-        const displayText = text.substring(0, commandIndex).trim()// 表示用テキスト
-        const commandText = text.substring(commandIndex + 8).trim()// command:以降のテキスト
-        setdisplayText(displayText)
-        setRequestedAnimation(commandText)
-        console.log("コマンド認識：" + commandText)
-      } else {
-        setdisplayText(text)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Tキーでチャット表示/非表示をトグル
+      if (e.key.toLowerCase() === 't' && !e.metaKey && !e.ctrlKey) {
+        if (document.activeElement?.tagName.toLowerCase() !== 'input') {
+          e.preventDefault()
+          setChatVisible(v => !v)
+        }
       }
-      if (clipNames.includes(text)) {
-        setRequestedAnimation(text)
+      // Escキーでメニュー表示/非表示をトグル
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (isChatVisible) {
+          setChatVisible(false)
+        } else {
+          setMenuVisible(v => !v)
+        }
       }
-    }, 5000, true)
-    return () => handle.stop()
-  }, [clipNames])
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isChatVisible])
 
-  const initialAnimation = useMemo(() => clipNames[0] ?? undefined, [clipNames])
+  // ログアウト処理
+  const handleLogout = () => {
+    console.log('ログアウトします')
+    socket.disconnect()
+    navigate('/login')
+  }
 
-  const handleLoaded = useCallback((clips: AnimationClip[]) => {
-  const names = clips.map(c => c.name)
-  setClipNames(prev => (JSON.stringify(prev) === JSON.stringify(names) ? prev : names))
-  }, [])
+  const handleMoveDevice = (deviceName: string) => {
+    console.log(`${deviceName} へ移動します`)
+    socket.emit('send_data', {
+      device_name: 'current_device_name', 
+      move: {
+        to_device_name: deviceName
+      }
+    })
+    setMenuVisible(false) 
+  }
 
-  const navigate = useNavigate();
+  useEffect(() => {
+    let mounted = true
+
+    const init = async () => {
+      try {
+        // server-side check for current session
+        const res = await fetch('/api/auth/detail', { credentials: 'include' })
+        if (!mounted) return
+        if (!res.ok) {
+          console.warn('サーバー上で認証されていません。ログインしてください。')
+          navigate('/login')
+          return
+        }
+
+        // authenticated -> connect socket and setup handlers
+        socket.connect()
+
+        socket.on('connect', () => {
+          console.log('Socket.IO connected')
+          socket.emit('join_room', { device_name: 'Browser ' + Date.now() })
+        })
+
+        socket.on('receive_data', (data: ReceiveData) => {
+          console.log('Received data:', data)
+          setChatHistory(prev => [...prev, { sender: 'Other', text: data.text }])
+        })
+
+        if (isAutoChatRunning) {
+          mockHandleRef.current = startAIMock((text) => {
+            setChatHistory(prev => [...prev, { sender: 'AI', text }])
+          })
+          console.log('自動応答を開始しました')
+        } else {
+          mockHandleRef.current?.stop()
+          console.log('自動応答を停止しました')
+        }
+      } catch (err) {
+        console.error('認証チェック中にエラー:', err)
+        navigate('/login')
+      }
+    }
+
+    init()
+
+    return () => {
+      mounted = false
+      console.log('Socket.IO disconnecting...')
+      socket.disconnect()
+      mockHandleRef.current?.stop()
+    }
+  }, [navigate, isAutoChatRunning])
+
+  const handleLoaded = (clips: any) => {
+    const names = clips.map((c: any) => c.name)
+    setClips(names)
+    setModelReady(true)
+  }
+
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
-      {/*デバック用メニュー*/}
-      <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1 }}>
-        <select onChange={(e) => { 
-          const value = e.target.value;
-          if (value === 'loginページへ') {
-            // ログインページへの遷移処理
-            navigate('/login');
-          } else if (clipNames.includes(value)) {
-            // アニメーションの場合の処理
-            setRequestedAnimation(value);
-            console.log("手動選択：" + value);
-          }
-        }}>
-          <option value="" disabled selected>-- デバック用メニュー --</option>
-          {clipNames.map(name => (
-            <option key={name} value={name}>{"アニメーション：" + name}</option>
-          ))}
-          {/* 追加のオプション例: ログインページへ */}
-          <option value="loginページへ">ログインページへ</option>
-        </select>
-      </div>
-      {/*AI(モック)テキスト表示エリア*/}
-      <div style={{ position: 'absolute', top: 20, left: 20, color: 'white', zIndex: 1, backgroundColor: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '5px' }}>
-        <p>{displayText}</p>
-      </div>
-      <Canvas shadows camera={{ position: [3, 3, 3], fov: 60 }}>
-        <color attach="background" args={['#e8e8e8']} />
-        <Environment preset="city" environmentIntensity={0.5} />
-        {/* Lights - トゥーン調に調整 */}
-        <ambientLight intensity={0.6} color="#ffffff" />
-        <directionalLight
-          position={[5, 8, 5]}
-          castShadow
-          intensity={0.8}
-          color="#ffffff"
-          shadow-mapSize-width={512}
-          shadow-mapSize-height={512}
-          shadow-camera-far={20}
-          shadow-camera-left={-10}
-          shadow-camera-right={10}
-          shadow-camera-top={10}
-          shadow-camera-bottom={-10}
-        />
-        <pointLight position={[-5, 3, -5]} intensity={0.2} color="#4dd0e1" />
-        <pointLight position={[5, 3, 5]} intensity={0.2} color="#80deea" />
-
-        {/* 無限に続く床 */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-          <planeGeometry args={[100, 100]} />
-          <meshStandardMaterial 
-            color="#d5d5d5" 
-            metalness={0.1} 
-            roughness={0.8}
-            fog={true}
-          />
-        </mesh>
-
-        {/* グリッド（オプション） */}
-        <gridHelper args={[100, 100, '#aaaaaa', '#cccccc']} position={[0, 0, 0]} />
-
-        {/* 浮遊するオブジェクト */}
-        <FloatingObjects />
-
+    <div style={{ width: '100vw', height: '100vh', position: 'relative', background: '#333' }}>
+      <Canvas camera={{ position: [0, 1.5, 3], fov: 50 }}>
+        <ambientLight intensity={1} />
+        <directionalLight position={[5, 5, 5]} intensity={2} />
+        <directionalLight position={[-5, 5, -5]} intensity={1} />
         <Suspense fallback={null}>
           <CharacterModel
             path="/models/character/hatunemini!.glb"
-            scale={1}
-            animationPaths={[
-              "/models/character/animation-run.glb",
-              "/models/character/animation-jump.glb"
-            ]}
-            initialAnimation={initialAnimation}
-            requestedAnimation={requestedAnimation}
+            animationPaths={['/models/character/animation-jump.glb', '/models/character/animation-run.glb']}
             onLoaded={handleLoaded}
-            logClipsOnLoad={true}
+            scale={1.0}
+            initialAnimation="Idle"
+            requestedAnimation={currentClip}
+            logClipsOnLoad
           />
         </Suspense>
-
-        <OrbitControls enableDamping makeDefault />
-
-        {/* 軽量なポストプロセッシング */}
-        <EffectComposer enableNormalPass>
-          <Bloom 
-            intensity={0.03} 
-            luminanceThreshold={0.99} 
-            luminanceSmoothing={0.98}
-            mipmapBlur
-          />
-        </EffectComposer>
+        <OrbitControls />
+        <gridHelper />
       </Canvas>
+      
+      {/* アニメーションデバッグ用UI */}
+      <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.5)', padding: 10, color: 'white' }}>
+        <div>Ready: {modelReady ? 'OK' : 'Loading...'}</div>
+        <div>
+          {clips.map(name => (
+            <button key={name} onClick={() => setCurrentClip(name)} style={{ background: currentClip === name ? 'red' : 'white' }}>
+              {name}
+            </button>
+          ))}
+        </div>
+        <pre style={{ maxHeight: 200, overflowY: 'auto' }}>
+          {chatHistory.map((msg, i) => <div key={i}>{msg.sender}: {msg.text}</div>)}
+        </pre>
+      </div>
+      
+      {/* Tキー: チャットUI */}
+      {isChatVisible && (
+        <div className="overlay chat-ui">
+          <div className="chat-log">
+            {chatHistory.map((msg, i) => (
+              <div key={i} className={`chat-message ${msg.sender.toLowerCase()}`}>
+                <strong>{msg.sender}:</strong> {msg.text}
+              </div>
+            ))}
+          </div>
+          <div className="chat-input-area">
+            <input type="text" placeholder="メッセージを入力... (Enterで送信)" autoFocus />
+            <button>送信</button>
+          </div>
+        </div>
+      )}
+
+      {/* Escキー: メインメニューUI */}
+      {isMenuVisible && (
+        <div className="overlay menu-ui">
+          <div className="menu-content">
+            <h3>メニュー</h3>
+            
+            <div className="menu-section">
+              <h4>アバターを移動</h4>
+              <p style={{fontSize: '0.8em', color: '#ccc'}}>（※現在はダミーです。今後デバイスリストを取得する機能が必要です）</p>
+              <button onClick={() => handleMoveDevice('PC (Main)')}>PC (Main)</button>
+              <button onClick={() => handleMoveDevice('Smartphone')}>Smartphone</button>
+              <button onClick={() => handleMoveDevice('Tablet')}>Tablet</button>
+            </div>
+            
+            <div className="menu-section">
+              <h4>設定</h4>
+              <button onClick={() => setAutoChatRunning(v => !v)}>
+                {isAutoChatRunning ? '自動応答を OFF にする' : '自動応答を ON にする'}
+              </button>
+            </div>
+
+            <div className="menu-section">
+              <h4>システム</h4>
+              <button onClick={handleLogout} className="logout-button">
+                ログアウト
+              </button>
+            </div>
+
+            <button onClick={() => setMenuVisible(false)} className="close-button">
+              閉じる (Esc)
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
-  }
+}
+
+export default App

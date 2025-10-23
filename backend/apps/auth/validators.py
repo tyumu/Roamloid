@@ -11,29 +11,21 @@ class SignupValidator:
 
         # Username and password are required
         if not username or not password:
-            # return False, "ユーザー名とパスワードは必須です。"
-            return False, "Username and password are required."
+            return False, "ユーザー名とパスワードは必須です。"
         # Username must be alphanumeric with underscores
         if not re.match(r"^\w+$", username):
-            # return False, "ユーザー名には英数字とアンダースコアのみ利用できます。"
-            return (
-                False,
-                "Username can only contain alphanumeric characters and underscores.",
-            )
+            return False, "ユーザー名には英数字とアンダースコアのみ利用できます。"
         # Username must be unique
         if User.query.filter_by(username=username).first():
-            # return False, "このユーザー名は既に使用されています。"
-            return False, "This username is already taken."
+            return False, "このユーザー名は既に使用されています。"
         # Password must be at least 8 characters
         if len(password) < 8:
-            # return False, "パスワードは8文字以上である必要があります。"
-            return False, "Password must be at least 8 characters long."
+            return False, "パスワードは8文字以上である必要があります。"
         # Password must contain both letters and numbers
         if not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
-            # return False, "パスワードには英字と数字の両方を含める必要があります。"
-            return False, "Password must contain both letters and numbers."
+            return False, "パスワードには英字と数字の両方を含める必要があります。"
 
-        return True, "Validation passed."
+        return True, "検証に成功しました。"
 
 
 class LoginValidator:
@@ -45,10 +37,9 @@ class LoginValidator:
 
         # Username and password are required
         if not username or not password:
-            # return False, "ユーザー名とパスワードは必須です。"
-            return False, "Username and password are required."
+            return False, "ユーザー名とパスワードは必須です。"
 
-        return True, "Validation passed."
+        return True, "検証に成功しました。"
 
 
 class ChangePasswordValidator:
@@ -60,21 +51,17 @@ class ChangePasswordValidator:
 
         # Both old and new passwords are required
         if not old_password or not new_password:
-            # return False, "古いパスワードと新しいパスワードは必須です。"
-            return False, "Old password and new password are required."
+            return False, "古いパスワードと新しいパスワードは必須です。"
         # New password must be different from old password
         if old_password == new_password:
-            # return False, "新しいパスワードは古いパスワードと異なる必要があります。"
-            return False, "New password must be different from old password."
+            return False, "新しいパスワードは古いパスワードと異なる必要があります。"
         # New password must be at least 8 characters
         if len(new_password) < 8:
-            # return False, "新しいパスワードは8文字以上である必要があります。"
-            return False, "New password must be at least 8 characters long."
+            return False, "新しいパスワードは8文字以上である必要があります。"
         # New password must contain both letters and numbers
         if not re.search(r"[A-Za-z]", new_password) or not re.search(
             r"\d", new_password
         ):
-            # return False, "新しいパスワードには英字と数字の両方を含める必要があります。"
-            return False, "New password must contain both letters and numbers."
+            return False, "新しいパスワードには英字と数字の両方を含める必要があります。"
 
-        return True, "Validation passed."
+        return True, "検証に成功しました。"

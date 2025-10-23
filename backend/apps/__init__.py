@@ -12,6 +12,9 @@ def create_app():
 
     # Initialize Flask app
     app = Flask(__name__)
+    # Allow routes without strict trailing slash enforcement to avoid
+    # automatic 308 redirects when tests call endpoints without a trailing slash.
+    app.url_map.strict_slashes = False
 
     # Enable CORS
     CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
@@ -21,6 +24,11 @@ def create_app():
 
     # Login manager setup
     login_manager.init_app(app)
+
+    # Initialize SocketIO for both runtime and tests so socketio.test_client
+    # can be used. The socketio instance lives in apps.room.socketio.
+    from .room.socketio import socketio
+    socketio.init_app(app, cors_allowed_origins="*")
 
     # API setup
     health_api.init_app(app)
