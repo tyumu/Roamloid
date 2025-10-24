@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
-import { CharacterModel, startAIMock } from './components/CharacterModel'
+import { CharacterModel, startAIMock } from './components/3d/CharacterModel'
 import type { AnimationClip, Group } from 'three'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
