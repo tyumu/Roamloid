@@ -2,7 +2,7 @@
 
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, Sky, Stars } from '@react-three/drei'
 import { CharacterModel, startAIMock, AIMockHandle } from './components/CharacterModel'
 import { useNavigate } from 'react-router-dom'
 import io from 'socket.io-client'
@@ -114,11 +114,25 @@ function App() {
         socket.on('receive_data', (data: ReceiveData) => {
           console.log('Received data:', data)
           setChatHistory(prev => [...prev, { sender: 'Other', text: data.text }])
+          // parse command:COMMAND_NAME in the message and trigger animation if present
+          const match = data.text && data.text.match(/command:\s*([\w\s!-]+)/i)
+          if (match && match[1]) {
+            const cmd = match[1].trim()
+            console.log('Detected command from socket:', cmd)
+            setCurrentClip(cmd)
+          }
         })
 
         if (isAutoChatRunning) {
           mockHandleRef.current = startAIMock((text) => {
             setChatHistory(prev => [...prev, { sender: 'AI', text }])
+            // AI mock may include 'command:NAME' -> trigger animation
+            const match = text && text.match(/command:\s*([\w\s!-]+)/i)
+            if (match && match[1]) {
+              const cmd = match[1].trim()
+              console.log('Detected command from AI mock:', cmd)
+              setCurrentClip(cmd)
+            }
           })
           console.log('自動応答を開始しました')
         } else {
@@ -153,6 +167,12 @@ function App() {
         <ambientLight intensity={1} />
         <directionalLight position={[5, 5, 5]} intensity={2} />
         <directionalLight position={[-5, 5, -5]} intensity={1} />
+        {/* Background: Sky + Stars for nicer environment */}
+        <Sky distance={450000} sunPosition={[100, 20, 100]} inclination={0.49} azimuth={0.25} />
+        <Stars radius={100} depth={50} count={5000} factor={4} fade speed={1} />
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[5, 5, 5]} intensity={1.2} />
+        <directionalLight position={[-5, 5, -5]} intensity={0.6} />
         <Suspense fallback={null}>
           <CharacterModel
             path="/models/character/hatunemini!.glb"
