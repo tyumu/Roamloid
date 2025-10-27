@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { AnimationClip, AnimationMixer, Group, LoopRepeat, LoopOnce, AnimationAction } from 'three'
+import { AnimationClip, AnimationMixer, Group, LoopRepeat, LoopOnce, AnimationAction, Mesh, SkinnedMesh} from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
-
+import { Points, PointMaterial, useGLTF } from '@react-three/drei';
+import * as THREE from 'three';
+import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
 //aisamples.tsxの文字列を順番に通知していく
 import { aiSamples } from './aisamples'
 export type AIMockHandle = { stop: () => void }
@@ -37,6 +39,19 @@ type CharacterModelProps = {
   requestedAnimation?: string
   /** 読み込み完了時にクリップ名をコンソールに出力するか */
   logClipsOnLoad?: boolean
+  /** App.tsxからワープ状態を制御するためのProps */
+  position?: [number, number, number];
+  visible?: boolean;
+  /** メッシュをAppに渡すためのコールバックProps */
+  onMeshReady?: (mesh: Mesh) => void;
+  /** ワープ開始(消滅)時に再生するアニメーション名 */
+  warpOutAnimation?: string
+  /** ワープ終了(出現)時に再生するアニメーション名 */
+  warpInAnimation?: string
+  /** (Modelから通知) warpOutAnimation の再生が完了したことを App に通知するコールバック */
+  onWarpOutAnimationFinished?: () => void
+  /** アニメーション完了時のコールバック */
+  onAnimationFinished?: (clipName: string) => void
 }
 
 export const CharacterModel: React.FC<CharacterModelProps> = ({
@@ -47,6 +62,13 @@ export const CharacterModel: React.FC<CharacterModelProps> = ({
   onLoaded,
   requestedAnimation,
   logClipsOnLoad = false,
+  position = [0, 0, 0],
+  visible = true,
+  onMeshReady,
+  warpInAnimation,
+  warpOutAnimation,
+  onWarpOutAnimationFinished,
+  onAnimationFinished
 }) => {
   // ベース GLB
   const baseGltf = useLoader(GLTFLoader, path)
@@ -85,6 +107,11 @@ export const CharacterModel: React.FC<CharacterModelProps> = ({
   const mixerRef = useRef<AnimationMixer | null>(null)
   const activeActionRef = useRef<ReturnType<AnimationMixer['clipAction']> | null>(null)
   const currentClipNameRef = useRef<string | null>(null)
+  // アニメーション終了監視用の state
+  const [
+    finishCallback,
+    setFinishCallback,
+  ] = useState<(() => void) | null>(null)
 
   // シーンの複製とmixerの初期化
   useEffect(() => {
@@ -93,6 +120,21 @@ export const CharacterModel: React.FC<CharacterModelProps> = ({
     // SkeletonUtilsでシーンを複製
     const clonedScene = clone(baseGltf.scene) as Group
     clonedSceneRef.current = clonedScene
+
+    // メッシュを検索して App (親) に通知
+    if (onMeshReady) {
+      let foundMesh: Mesh | null = null
+      clonedScene.traverse(object => {
+        if (!foundMesh && object instanceof Mesh) {
+          foundMesh = object
+        }
+      })
+      if (foundMesh) {
+        onMeshReady(foundMesh)
+      } else {
+        console.warn('CharacterModel: パーティクル用のメッシュが見つかりませんでした。')
+      }
+    }
 
     // rootRefに追加
     if (rootRef.current) {
@@ -125,11 +167,18 @@ export const CharacterModel: React.FC<CharacterModelProps> = ({
         mixerRef.current.stopAllAction()
       }
     }
-  }, [baseGltf.scene, allAnimations, initialAnimation, onLoaded, logClipsOnLoad])
+  }, [baseGltf.scene, allAnimations, initialAnimation, onLoaded, logClipsOnLoad, onMeshReady])
 
   // requestedAnimationの変更でアニメーション切り替え
   useEffect(() => {
-    if (mixerRef.current && requestedAnimation && requestedAnimation !== currentClipNameRef.current) {
+    // ワープ準備アニメ(finishCallback がセットされている)が再生中の場合は、通常のアニメ切り替えリクエストを無視する
+    if (finishCallback) return
+
+    if (
+      mixerRef.current &&
+      requestedAnimation &&
+      requestedAnimation !== currentClipNameRef.current
+    ) {
       const newAction = playAnimation(mixerRef.current, allAnimations, requestedAnimation, {
         prevAction: activeActionRef.current,
         crossFade: true,
@@ -139,11 +188,97 @@ export const CharacterModel: React.FC<CharacterModelProps> = ({
         currentClipNameRef.current = requestedAnimation
       }
     }
-  }, [requestedAnimation, allAnimations])
+  }, [requestedAnimation, allAnimations, finishCallback])
 
-  // mixerの更新
+  // ワープ開始 (WARP_OUT) アニメーションのトリガー用 useEffect
+  useEffect(() => {
+    // App から warpOutAnimation の指示が来て、ミキサーがあり、コールバックがセットされているか？
+    if (warpOutAnimation && mixerRef.current && onWarpOutAnimationFinished) {
+      console.log(`CharacterModel: warpOutAnimation "${warpOutAnimation}" を再生します。`)
+
+      // 終了時に呼び出すコールバック関数を state にセット
+      // (useFrame 内で参照するため、関数をラップして渡す)
+      setFinishCallback(() => onWarpOutAnimationFinished)
+
+      const newAction = playAnimation(mixerRef.current, allAnimations, warpOutAnimation, {
+        prevAction: activeActionRef.current,
+        crossFade: true,
+        loop: LoopOnce, // 1回だけ再生
+        repetitions: 1,
+      })
+
+      if (newAction) {
+        activeActionRef.current = newAction
+        currentClipNameRef.current = warpOutAnimation
+      }
+    }
+    // warpOutAnimation が undefined に戻った時は何もしない (コールバックでリセットされる)
+  }, [warpOutAnimation, allAnimations, onWarpOutAnimationFinished])
+
+  // ワープ出現 (WARP_IN) アニメーションのトリガー用 useEffect
+  useEffect(() => {
+    if (warpInAnimation && mixerRef.current) {
+      console.log(`CharacterModel: warpInAnimation "${warpInAnimation}" を再生します。`)
+      
+      const newAction = playAnimation(mixerRef.current, allAnimations, warpInAnimation, {
+        prevAction: activeActionRef.current,
+        crossFade: true,
+        loop: LoopOnce,
+        repetitions: 1,
+        clampWhenFinished: true,
+      });
+
+      if (newAction) {
+        activeActionRef.current = newAction;
+        currentClipNameRef.current = warpInAnimation;
+      }
+    }
+  }, [warpInAnimation, allAnimations]);
+
+// mixer の更新と、アニメーション終了イベントの監視
   useFrame((state, delta) => {
-    if (mixerRef.current) mixerRef.current.update(delta)
+    if (mixerRef.current) {
+      mixerRef.current.update(delta)
+
+      // アニメーション終了コールバック (finishCallback) がセットされているか？
+      // (ワープアニメの終了検知: こちらを先に処理します)
+      if (finishCallback) {
+        // 現在のアクションが再生中で、かつループ設定ではないか？
+        if (activeActionRef.current && !activeActionRef.current.isRunning()) {
+          console.log(
+            `CharacterModel: ワープアニメ "${currentClipNameRef.current}" が終了しました。`,
+          )
+          
+          // App.tsx (親) に通知
+          finishCallback() // onWarpOutAnimationFinished が呼ばれる
+          
+          // コールバックをリセット (重要: これで無限ループを防ぐ)
+          setFinishCallback(null)
+
+          // ワープアニメが終了したので、参照をクリア
+          currentClipNameRef.current = null 
+          activeActionRef.current = null
+        }
+        
+        // finishCallback がある（＝ワープアニメ再生中）場合は、
+        // 以下の汎用終了検知はスキップする
+        return; 
+      }
+
+      // 一回再生アニメの終了検知 (汎用)
+      // (finishCallback が null の場合のみ、こちらが実行されます)
+      if (
+        activeActionRef.current &&
+        !activeActionRef.current.isRunning() &&
+        currentClipNameRef.current
+      ) {
+        // コールバックがあれば通知
+        if (onAnimationFinished) {
+          onAnimationFinished(currentClipNameRef.current)
+        }
+        currentClipNameRef.current = null
+      }
+    }
   })
 
   const handlePointerDown = useCallback(() => {
@@ -162,7 +297,7 @@ export const CharacterModel: React.FC<CharacterModelProps> = ({
   }, [allAnimations])
 
   return (
-    <group ref={rootRef} scale={scale} onPointerDown={handlePointerDown} />
+    <group ref={rootRef} scale={scale} onPointerDown={handlePointerDown} position={position} visible={visible} />
   )
 }
 type PlayAnimationOptions = {
@@ -221,6 +356,11 @@ export function playAnimation(
     if (crossFade) {
       // クロスフェード（推奨）: スムーズに切り替わる
       prevAction.enabled = true // 確実に有効化
+      // ポーズが固定された (clamp) 状態からフェードすると描画が破綻するため、
+      // フェードアウトする側 (prevAction) のクランプをここで解除します
+      if (prevAction.clampWhenFinished) {
+        prevAction.clampWhenFinished = false;
+      }
       action.enabled = true
       action.setEffectiveWeight(1)
       action.crossFadeFrom(prevAction, fadeDuration, true) // warp=true で前のアクションを自動停止
@@ -239,7 +379,12 @@ export function playAnimation(
     action.play()
   }
   
-  console.log(`Playing animation: "${name}" (loop: ${loop === LoopRepeat ? 'repeat' : 'once'})`)
+  console.log(
+    `Playing animation: "${name}" (loop: ${
+      loop === LoopRepeat ? 'repeat' : loop === LoopOnce ? 'once' : 'unknown'
+    })`,
+  )
+
   
   return action
 }
