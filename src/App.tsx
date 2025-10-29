@@ -7,6 +7,9 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { useNavigate } from 'react-router-dom'
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js'
+import { io, Socket } from "socket.io-client";
+
+const API_URL = "http://localhost:5000";
 
 // 浮遊するオブジェクトコンポーネント
 function FloatingObjects() {
@@ -311,6 +314,61 @@ export default function App() {
     }, 5000, true)
     return () => handle.stop()
   }, [clipNames])
+
+  // Socket.IO 接続の初期化
+  const socketRef = useRef<Socket | null>(null);
+  useEffect(() => {
+      // Appコンポーネントが読み込まれたら、Socket.IOに接続する
+
+      // 既に接続済みなら何もしない
+      if (socketRef.current) return;
+
+      // クッキー付きで接続
+      const newsocket = io(API_URL, {
+          withCredentials: true 
+      });
+      socketRef.current = newsocket;
+
+      // 接続が成功したら、コンソールにログを出す
+      newsocket.on('connect', () => {
+          console.log('Socket.IO 接続成功！ (ID:', newsocket.id, ')');
+
+          // 後々、デバイス名を入力するUIができたら、ここで emit
+          // (お手本 の「ルーム参加」ボタンの処理)
+          // const device_name = "saba1"; // ← 本当はUIから取得する
+          // socket.emit('join_room', { device_name });
+      });
+
+      // サーバーからイベントを受信するリスナーをまとめて設定
+      newsocket.on('disconnect', () => {
+          console.log('Socket.IO 切断...');
+      });
+
+      newsocket.on('joined', (data) => {
+          console.log('ルーム参加成功:', data);
+      });
+
+      newsocket.on('receive_data', (data) => {
+          console.log('データ受信 (receive_data):', data);
+          // (例: AIからのチャット返信 `data.text` を画面に表示する)
+      });
+
+    newsocket.on('moved_3d', (data) => {
+        console.log('★AIが移動しました！ (moved_3d):', data);
+        // data.to_device_name を見て、
+        // AIキャラのワープアニメーションを起動する処理をここから呼び出し
+    });
+
+    newsocket.on('error', (data) => {
+        console.error('Socket.IO エラー:', data);
+    });
+
+    // コンポーネントが閉じる時に、接続もちゃんと切る
+    return () => {
+        newsocket.disconnect();
+        socketRef.current = null;
+    };
+  }, []); // ← [] が空なので、初回の一回だけ実行
 
   const initialAnimation = useMemo(() => clipNames[0] ?? undefined, [clipNames])
 
