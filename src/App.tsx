@@ -368,7 +368,7 @@ export default function App() {
 
     // --- (A) "moved_3d" の処理 ---
     // (この関数は useEffect の中で定義するので、常に最新の myDeviceName と characterVisible を参照できる)
-    const handleMoved3D = (data: { to_device_name: string }) => {
+    const handleMoved3D = async (data: { to_device_name: string }) => {
         console.log('AIが移動しました (moved_3d):', data);
         setAiLocation(data.to_device_name);// AIの現在地を更新
 
@@ -376,13 +376,16 @@ export default function App() {
 
         if (targetDevice === myDeviceName) {
             // AIが「自分」のところに来た
+            const warpDelay = 2000;
+            console.log(`AIが自分のところに来ています...${warpDelay}ms 後に triggerWarpIn() を実行します`);
+            await new Promise(resolve => setTimeout(resolve, warpDelay));// Promise と setTimeout を使って、指定時間待つ
             console.log("AIがここに来たので、triggerWarpIn() を実行します");
-            setCharacterVisible(true);
+            triggerWarpIn();
         
         } else if (characterVisible) { // ← ここも最新の true/false が入る
             // AIが「自分」じゃないどこかへ行った
             console.log("AIがここから去ったので、triggerWarpOut() を実行します");
-            setCharacterVisible(false);
+            triggerWarpOut();
         }
     };
     
@@ -474,8 +477,8 @@ export default function App() {
       setSelectedDebugOption("");
       return;
     }
-    
-    const appearPos: [number, number, number] = [3, 0, 3]; // ここで出現位置を指定
+
+    const appearPos: [number, number, number] = [0, 0, 0]; // ここで出現位置を指定
     console.log(`出現実行: ${appearPos}`);
 
     // キャラクターを(非表示のまま)出現位置へ移動
