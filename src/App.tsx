@@ -278,7 +278,7 @@ export default function App() {
   //ワープ状態管理
   const [warpState, setWarpState] = useState<'DEFAULT' | 'PRE_WARP_OUT' | 'WARP_OUT' | 'WARP_IN'>('DEFAULT')
   const [characterPos, setCharacterPos] = useState<[number, number, number]>([0, 0, 0]) // キャラクターの初期位置
-  const [characterVisible, setCharacterVisible] = useState(true)
+  const [characterVisible, setCharacterVisible] = useState<boolean | undefined>(undefined); // キャラクターの表示/非表示管理
   const [sourceMesh, setSourceMesh] = useState<THREE.Mesh | null>(null)
 
   // アニメーション連携用
@@ -290,85 +290,119 @@ export default function App() {
   const [nextAction, setNextAction] = useState<'NONE' | 'WARP_IN'>('NONE'); // 'WARP_OUT' の後に 'WARP_IN' を実行するかどうか
   const [warpTargetPos, setWarpTargetPos] = useState<[number, number, number]>([0, 0, 0]);  // 'WARP_IN' の目標地点
 
-  // デバック用セレクトの選択状態管理
-  const [selectedDebugOption, setSelectedDebugOption] = useState<string>("")
+  const [selectedDebugOption, setSelectedDebugOption] = useState<string>("")  // デバック用セレクトの選択状態管理
 
-    // クリップ名が揃ったらモックを開始
-  useEffect(() => {
-    if (clipNames.length === 0) return
-    const handle = startAIMock((text) => {
-      const commandIndex = text.indexOf('command:')
-      console.log("受信テキスト：" + text)
-      if (commandIndex !== -1) {
-        const displayText = text.substring(0, commandIndex).trim()// 表示用テキスト
-        const commandText = text.substring(commandIndex + 8).trim()// command:以降のテキスト
-        setdisplayText(displayText)
-        setRequestedAnimation(commandText)
-        console.log("コマンド認識：" + commandText)
-      } else {
-        setdisplayText(text)
-      }
-      if (clipNames.includes(text)) {
-        setRequestedAnimation(text)
-      }
-    }, 5000, true)
-    return () => handle.stop()
-  }, [clipNames])
+  const [chatMessage, setChatMessage] = useState("");// メッセージ管理
+
+  const [myDeviceName, setMyDeviceName] = useState<string | null>(null);// 自分のデバイス名を覚えておくための state
+
+  const [aiLocation, setAiLocation] = useState<string | null>(null); // AIの現在地を覚えておくための state
+
+  //   // クリップ名が揃ったらモックを開始
+  // useEffect(() => {
+  //   if (clipNames.length === 0) return
+  //   const handle = startAIMock((text) => {
+  //     const commandIndex = text.indexOf('command:')
+  //     console.log("受信テキスト：" + text)
+  //     if (commandIndex !== -1) {
+  //       const displayText = text.substring(0, commandIndex).trim()// 表示用テキスト
+  //       const commandText = text.substring(commandIndex + 8).trim()// command:以降のテキスト
+  //       setdisplayText(displayText)
+  //       setRequestedAnimation(commandText)
+  //       console.log("コマンド認識：" + commandText)
+  //     } else {
+  //       setdisplayText(text)
+  //     }
+  //     if (clipNames.includes(text)) {
+  //       setRequestedAnimation(text)
+  //     }
+  //   }, 5000, true)
+  //   return () => handle.stop()
+  // }, [clipNames])
 
   // Socket.IO 接続の初期化
   const socketRef = useRef<Socket | null>(null);
+
+  // 1. 接続用の useEffect (初回1回だけ実行)
   useEffect(() => {
-      // Appコンポーネントが読み込まれたら、Socket.IOに接続する
-
-      // 既に接続済みなら何もしない
-      if (socketRef.current) return;
-
       // クッキー付きで接続
       const newsocket = io(API_URL, {
           withCredentials: true 
       });
       socketRef.current = newsocket;
 
-      // 接続が成功したら、コンソールにログを出す
+      // "connect" したら、prompt を出して、自分のデバイス名を state に保存する
       newsocket.on('connect', () => {
           console.log('Socket.IO 接続成功！ (ID:', newsocket.id, ')');
-
-          // 後々、デバイス名を入力するUIができたら、ここで emit
-          // (お手本 の「ルーム参加」ボタンの処理)
-          // const device_name = "saba1"; // ← 本当はUIから取得する
-          // socket.emit('join_room', { device_name });
+          const device_name = prompt("デバイス名を入力してください", "saba1");
+          if(device_name) {
+              newsocket.emit('join_room', { device_name });
+              setMyDeviceName(device_name); // ← これで 2. の Effect が動く
+          }
       });
 
-      // サーバーからイベントを受信するリスナーをまとめて設定
-      newsocket.on('disconnect', () => {
-          console.log('Socket.IO 切断...');
-      });
-
+      // "joined" したら、AIがここにいるか？の初期状態を state に保存する
       newsocket.on('joined', (data) => {
-          console.log('ルーム参加成功:', data);
+        console.log('ルーム参加成功:', data);
+        setCharacterVisible(data.is_ai_here); // これで 2. の Effect が動く
+        setAiLocation(data.ai_location);
       });
 
-      newsocket.on('receive_data', (data) => {
-          console.log('データ受信 (receive_data):', data);
-          // (例: AIからのチャット返信 `data.text` を画面に表示する)
-      });
+      // エラー系はここでOK
+      newsocket.on('disconnect', () => console.log('Socket.IO 切断...'));
+      newsocket.on('error', (data) => console.error('Socket.IO エラー:', data));
 
-    newsocket.on('moved_3d', (data) => {
-        console.log('★AIが移動しました！ (moved_3d):', data);
-        // data.to_device_name を見て、
-        // AIキャラのワープアニメーションを起動する処理をここから呼び出し
-    });
+      // コンポーネントが閉じる時に接続を切る
+      return () => {
+          newsocket.disconnect();
+          socketRef.current = null;
+      };
+  }, []); // [] なので、初回1回だけ実行
 
-    newsocket.on('error', (data) => {
-        console.error('Socket.IO エラー:', data);
-    });
+  // 2. イベント監視用の useEffect (state が新しくなるたびに再実行)
+  useEffect(() => {
+    const socket = socketRef.current;
+    
+    // まだ接続してないか、デバイス名が決まってない時は何もしない
+    if (!socket || !myDeviceName) return;
 
-    // コンポーネントが閉じる時に、接続もちゃんと切る
-    return () => {
-        newsocket.disconnect();
-        socketRef.current = null;
+    // --- (A) "moved_3d" の処理 ---
+    // (この関数は useEffect の中で定義するので、常に最新の myDeviceName と characterVisible を参照できる)
+    const handleMoved3D = (data: { to_device_name: string }) => {
+        console.log('AIが移動しました (moved_3d):', data);
+        setAiLocation(data.to_device_name);// AIの現在地を更新
+
+        const targetDevice = data.to_device_name;
+
+        if (targetDevice === myDeviceName) {
+            // AIが「自分」のところに来た
+            console.log("AIがここに来たので、triggerWarpIn() を実行します");
+            setCharacterVisible(true);
+        
+        } else if (characterVisible) { // ← ここも最新の true/false が入る
+            // AIが「自分」じゃないどこかへ行った
+            console.log("AIがここから去ったので、triggerWarpOut() を実行します");
+            setCharacterVisible(false);
+        }
     };
-  }, []); // ← [] が空なので、初回の一回だけ実行
+    
+    // --- (B) "receive_data" の処理 ---
+    const handleReceiveData = (data: { device_name: string, text: string }) => {
+        console.log('データ受信 (receive_data):', data);
+    };
+
+    // (A) と (B) のリスナーを登録
+    socket.on('moved_3d', handleMoved3D);
+    socket.on('receive_data', handleReceiveData);
+
+    // クリーンアップ関数 
+    // (useEffect が再実行される前に、古いリスナーを解除)
+    return () => {
+        socket.off('moved_3d', handleMoved3D);
+        socket.off('receive_data', handleReceiveData);
+    };
+
+  }, [myDeviceName, characterVisible]); // state が変わるたびに再実行
 
   const initialAnimation = useMemo(() => clipNames[0] ?? undefined, [clipNames])
 
@@ -379,7 +413,7 @@ export default function App() {
 
   const navigate = useNavigate();
 
-/** 1. 現在地から (0,0,0) へフルワープ */
+  /** 1. 現在地から (0,0,0) へフルワープ */
   const triggerFullWarp = () => {
     if (warpState !== 'DEFAULT' || !sourceMesh) {
       console.warn('ワープ不可');
@@ -498,20 +532,32 @@ export default function App() {
   // ワープ中かどうかの判定フラグ
   const isWarping = warpState !== 'DEFAULT';
 
-//warpstate === 'DEFAULT' (ワープしていない)時に'Standing Jump'が一回再生ならデフォルトアニメへ復帰
-const handleAnimationFinished = useCallback((clipName: string) => {
-  if (warpState === 'DEFAULT') {
-    if (clipName === 'Standing Jump') {
-      // もしそれが warpInAnim (出現アニメ) だった場合は、
-      // アニメが完了したのでトリガーをリセットする
-      if (warpInAnim === 'Standing Jump') {
-        setWarpInAnim(undefined);
+  //warpstate === 'DEFAULT' (ワープしていない)時に'Standing Jump'が一回再生ならデフォルトアニメへ復帰
+  const handleAnimationFinished = useCallback((clipName: string) => {
+    if (warpState === 'DEFAULT') {
+      if (clipName === 'Standing Jump') {
+        // もしそれが warpInAnim (出現アニメ) だった場合は、
+        // アニメが完了したのでトリガーをリセットする
+        if (warpInAnim === 'Standing Jump') {
+          setWarpInAnim(undefined);
+        }
+        setRequestedAnimation('アクション') // ループアニメ名
+        console.log('デフォルトのループアニメーションへ復帰');
       }
-      setRequestedAnimation('アクション') // ループアニメ名
-      console.log('デフォルトのループアニメーションへ復帰');
     }
-  }
-}, [warpState, warpInAnim]);
+  }, [warpState, warpInAnim]);
+
+  // メッセージ送信ハンドラ
+  const handleSendMessage = () => {
+    if (chatMessage && socketRef.current) {
+        // バックエンド (handle_send_data) にメッセージを送信！
+        socketRef.current.emit('send_data', {
+            device_name: myDeviceName,
+            msg: chatMessage
+        });
+        setChatMessage(""); // 入力欄をクリア
+    }
+};
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
@@ -555,10 +601,26 @@ const handleAnimationFinished = useCallback((clipName: string) => {
           </option>
         </select>
       </div>
+
+      {/*チャット入力エリア*/}
+      <div style={{ position: 'absolute', bottom: 20, left: 20, zIndex: 1 }}>
+        <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)}/>
+        <button onClick={handleSendMessage}>送信</button>
+      </div>
+
+      {/* AIの現在地を表示するUI */}
+      <div style={{ position: 'absolute', top: 80, left: 20, color: 'white', zIndex: 1 }}>
+        <p>
+          {characterVisible ? " AIはここにいます" : `AIは「${aiLocation}」にいます`}
+        </p>
+      </div>
+      
       {/*AI(モック)テキスト表示エリア*/}
+      {/* 
       <div style={{ position: 'absolute', top: 20, left: 20, color: 'white', zIndex: 1, backgroundColor: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '5px' }}>
         <p>{displayText}</p>
       </div>
+       */}
       <Canvas shadows camera={{ position: [3, 3, 3], fov: 60 }}>
         <color attach="background" args={['#e8e8e8']} />
         <Environment preset="city" environmentIntensity={0.5} />
@@ -653,4 +715,4 @@ const handleAnimationFinished = useCallback((clipName: string) => {
       </Canvas>
     </div>
   )
-  }
+}
