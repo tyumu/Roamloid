@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaUser, FaLock, FaSignInAlt } from "react-icons/fa";
+import { AuthApi } from "../utils/api";
 
 const Login = () => {
   const [username, setUsername] = useState("");
@@ -12,23 +13,14 @@ const Login = () => {
     e.preventDefault();
     setMessage("");
 
-    const API_URL = "http://localhost:5000";
-
     try {
-      const res = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ username, password }),
-      });
+      const { ok, data } = await AuthApi.login(username, password);
 
-      const data = await res.json();
-
-      if (res.ok) {
+      if (ok) {
         setMessage("ログイン成功！");
         navigate("/app");
       } else {
-        setMessage(data.error_message || "ログインに失敗しました。");
+        setMessage((data as any)?.error_message || "ログインに失敗しました。");
       }
     } catch (err) {
       setMessage("通信エラーが発生しました。");

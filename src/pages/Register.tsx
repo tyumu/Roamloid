@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaUser, FaLock, FaUserPlus } from "react-icons/fa";
+import { AuthApi } from "../utils/api";
 
 const Register = () => {
 	const [username, setUsername] = useState("");
@@ -23,24 +24,15 @@ const Register = () => {
 			return;
 		}
 
-		const API_URL = "http://localhost:5000";
+			try {
+				// Prefer /signup per backend spec (both /signup and /register are allowed)
+				const { ok, data } = await AuthApi.signup(username, password);
 
-		try {
-			// Backend issues a session cookie; keep credentials for consistent auth flow.
-			const res = await fetch(`${API_URL}/api/auth/register`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				credentials: "include",
-				body: JSON.stringify({ username, password }),
-			});
-
-			const data = await res.json();
-
-			if (res.ok) {
+				if (ok) {
 				setMessage("登録に成功しました。ログインページへ移動します。");
 				setTimeout(() => navigate("/login"), 750);
 			} else {
-				setMessage(data.error_message || "登録に失敗しました。");
+					setMessage((data as any)?.error_message || "登録に失敗しました。");
 			}
 		} catch (err) {
 			setMessage("通信エラーが発生しました。");
