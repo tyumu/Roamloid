@@ -97,6 +97,7 @@ const Register = () => {
 								border: "1px solid #d0d0d0",
 								fontSize: 16,
 								outline: "none",
+								boxSizing: "border-box",
 							}}
 							value={username}
 							onChange={(e) => setUsername(e.target.value)}
@@ -123,6 +124,7 @@ const Register = () => {
 								border: "1px solid #d0d0d0",
 								fontSize: 16,
 								outline: "none",
+								boxSizing: "border-box",
 							}}
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
@@ -149,6 +151,7 @@ const Register = () => {
 								border: "1px solid #d0d0d0",
 								fontSize: 16,
 								outline: "none",
+								boxSizing: "border-box",
 							}}
 							value={confirmPassword}
 							onChange={(e) => setConfirmPassword(e.target.value)}
@@ -192,11 +195,6 @@ const Register = () => {
 					<span>すでにアカウントをお持ちですか？ </span>
 					<Link to="/login" style={{ color: "#39C5BB", fontWeight: 600, textDecoration: "none" }}>
 						ログインはこちら
-					</Link>
-				</div>
-				<div style={{ textAlign: "center", marginTop: 12 }}>
-					<Link to="/app" style={{ fontSize: 12, color: "#888" }}>
-						ホームへ戻る
 					</Link>
 				</div>
 			</div>

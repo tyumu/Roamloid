@@ -85,6 +85,7 @@ const Login = () => {
                 border: "1px solid #d0d0d0",
                 fontSize: 16,
                 outline: "none",
+                boxSizing: "border-box",
               }}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -111,6 +112,7 @@ const Login = () => {
                 border: "1px solid #d0d0d0",
                 fontSize: 16,
                 outline: "none",
+                boxSizing: "border-box",
               }}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -157,11 +159,6 @@ const Login = () => {
             style={{ color: "#39C5BB", fontWeight: 600, textDecoration: "none" }}
           >
             新規登録
-          </Link>
-        </div>
-        <div style={{ textAlign: "center", marginTop: 12 }}>
-          <Link to="/app" style={{ fontSize: 12, color: "#888" }}>
-            ホームへ戻る
           </Link>
         </div>
       </div>
