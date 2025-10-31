@@ -228,7 +228,7 @@ export default function App() {
       }
 
       const targetDevice = payload.to_device_name;
-      appendChatEntry("ME", payload.text);
+      appendChatEntry("AI", payload.text);
       appendChatEntry("SYSTEM", `AIが${targetDevice}に移動しました。`);
       if (warpState !== "DEFAULT") {
         console.warn(`ワープ中 (state: ${warpState}) に移動イベントを受信。無視します。`);
