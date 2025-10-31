@@ -278,8 +278,10 @@ export default function App() {
   //ワープ状態管理
   const [warpState, setWarpState] = useState<'DEFAULT' | 'PRE_WARP_OUT' | 'WARP_OUT' | 'WARP_IN'>('DEFAULT')
   const [characterPos, setCharacterPos] = useState<[number, number, number]>([0, 0, 0]) // キャラクターの初期位置
-  const [characterVisible, setCharacterVisible] = useState<boolean | undefined>(undefined); // キャラクターの表示/非表示管理
+  const [characterVisible, setCharacterVisible] = useState<boolean>(true); // キャラクターの表示/非表示管理 モデルデータ読み込みの為、初期値をtrueに変更
   const [sourceMesh, setSourceMesh] = useState<THREE.Mesh | null>(null)
+
+  const [isLoading, setIsLoading] = useState(true);// ローディング画面用
 
   // アニメーション連携用
   const [warpOutAnim, setWarpOutAnim] = useState<string | undefined>(undefined)
@@ -346,6 +348,11 @@ export default function App() {
         console.log('ルーム参加成功:', data);
         setCharacterVisible(data.is_ai_here); // これで 2. の Effect が動く
         setAiLocation(data.ai_location);
+
+        // ローディング画面を非表示にする前に少し待つ
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
       });
 
       // エラー系はここでOK
@@ -372,18 +379,33 @@ export default function App() {
         console.log('AIが移動しました (moved_3d):', data);
         setAiLocation(data.to_device_name);// AIの現在地を更新
 
+        // 既にワープ中 (DEFAULTじゃない) なら、この新しい `moved_3d` イベントは無視して、すぐに関数を終了する
         const targetDevice = data.to_device_name;
+        if (warpState !== 'DEFAULT') {
+            console.warn(
+              `ワープ中 (state: ${warpState}) に新しい移動指示 (to: ${targetDevice}) を受信。無視します。`
+            );
+            return; // ← ここで処理を中断
+        }
 
         if (targetDevice === myDeviceName) {
             // AIが「自分」のところに来た
-            const warpDelay = 2000;
-            console.log(`AIが自分のところに来ています...${warpDelay}ms 後に triggerWarpIn() を実行します`);
+            const warpDelay = 2500;
+            console.log(`AIがここ(${myDeviceName})に来ています...${warpDelay}ms 後に triggerWarpIn() を実行します`);
             await new Promise(resolve => setTimeout(resolve, warpDelay));// Promise と setTimeout を使って、指定時間待つ
+            if (!sourceMesh) {
+                console.warn('ワープインしようとしましたが、sourceMesh がまだ準備できていません');
+                return; // メッシュがないのでワープ不可
+            }
             console.log("AIがここに来たので、triggerWarpIn() を実行します");
             triggerWarpIn();
         
         } else if (characterVisible) { // ← ここも最新の true/false が入る
             // AIが「自分」じゃないどこかへ行った
+            if (!sourceMesh) {
+                 console.warn('ワープアウトしようとしましたが、sourceMesh がまだ準備できていません');
+                 return;
+            }
             console.log("AIがここから去ったので、triggerWarpOut() を実行します");
             triggerWarpOut();
         }
@@ -405,7 +427,7 @@ export default function App() {
         socket.off('receive_data', handleReceiveData);
     };
 
-  }, [myDeviceName, characterVisible]); // state が変わるたびに再実行
+  }, [myDeviceName, characterVisible, warpState, sourceMesh]); // state が変わるたびに再実行
 
   const initialAnimation = useMemo(() => clipNames[0] ?? undefined, [clipNames])
 
@@ -446,7 +468,7 @@ export default function App() {
 
   /** 2. 現在地で「消えるだけ」 */
   const triggerWarpOut = () => {
-    if (warpState !== 'DEFAULT' || !sourceMesh) {
+    if (warpState !== 'DEFAULT') {
       console.warn('ワープ不可');
       setSelectedDebugOption("");
       return;
@@ -472,7 +494,7 @@ export default function App() {
 
   /** 3. 指定した位置 (例: 3,0,3) で「現れるだけ」 */
   const triggerWarpIn = () => {
-    if (warpState !== 'DEFAULT' || !sourceMesh) {
+    if (warpState !== 'DEFAULT') {
       console.warn('ワープ不可');
       setSelectedDebugOption("");
       return;
@@ -560,10 +582,26 @@ export default function App() {
         });
         setChatMessage(""); // 入力欄をクリア
     }
-};
+  };
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
+      {/* ローディング画面を追加 (画面全体をミク色で覆う) ↓↓↓ */}
+      {isLoading && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0,
+          width: '100%', height: '100%',
+          backgroundColor: '#39C5BB',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white'
+        }}>
+          <p>Loading...</p>
+        </div>
+      )}
+
       {/*デバック用メニュー*/}
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1 }}>
         <select 
