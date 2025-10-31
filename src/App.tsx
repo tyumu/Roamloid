@@ -11,7 +11,7 @@ import { OrbitControls, Environment } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { AnimationClip } from "three";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import WarpParticles from "./components/WarpParticles";
 import ChatOverlay from "./components/ChatOverlay";
 import DebugMenu from "./components/DebugMenu";
@@ -26,7 +26,7 @@ import {
   type ReceivePayload,
 } from "./hooks/useSocketManager";
 
-const API_URL = "http://localhost:5000";
+import { API_BASE } from "./utils/api";
 
 function FloatingObjects() {
   const torusRef = useRef<THREE.InstancedMesh>(null!);
@@ -165,6 +165,8 @@ export default function App() {
   const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const deviceName = location.state?.deviceName as string | null;
 
   const {
     warpState,
@@ -206,7 +208,7 @@ export default function App() {
   const handleReceiveData = useCallback(
     (payload: ReceivePayload) => {
       const currentDevice = myDeviceNameRef.current;
-      if (payload.device_name === currentDevice) {
+      if (payload.device_name !== currentDevice) {
         appendChatEntry("ME", payload.msg);
       }
       appendChatEntry("AI", payload.text);
@@ -226,6 +228,7 @@ export default function App() {
       }
 
       const targetDevice = payload.to_device_name;
+      appendChatEntry("ME", payload.text);
       appendChatEntry("SYSTEM", `AIが${targetDevice}に移動しました。`);
       if (warpState !== "DEFAULT") {
         console.warn(`ワープ中 (state: ${warpState}) に移動イベントを受信。無視します。`);
@@ -252,11 +255,19 @@ export default function App() {
   );
 
   const { isLoading, aiLocation, myDeviceName, sendMessage } = useSocketManager({
-    apiUrl: API_URL,
+    apiUrl: API_BASE,
+    deviceName: deviceName || '',
     onJoined: handleJoined,
     onMoved3d: handleAiMoved,
     onReceiveData: handleReceiveData,
   });
+
+    useEffect(() => {
+    if (!isLoading && !myDeviceName) {
+      console.warn("App: デバイス名が無いか、接続に失敗したので /devices に戻します。");
+      navigate("/devices");
+    }
+  }, [isLoading, myDeviceName, navigate]);
 
   useEffect(() => {
     myDeviceNameRef.current = myDeviceName;

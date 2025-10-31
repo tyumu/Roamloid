@@ -3,6 +3,7 @@ import App from "../App";
 import ProtectedRoute from "./ProtectedRoute";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
+import DeviceSelection from "../pages/DeviceSelection";
 
 const AppRoutes = () => {
   return (
@@ -19,6 +20,7 @@ const AppRoutes = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/devices" element={<DeviceSelection />} />
     </Routes>
   );
 };

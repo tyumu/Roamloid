@@ -18,7 +18,7 @@ const Login = () => {
 
       if (ok) {
         setMessage("ログイン成功！");
-        navigate("/app");
+        navigate("/devices");
       } else {
         setMessage((data as any)?.error_message || "ログインに失敗しました。");
       }

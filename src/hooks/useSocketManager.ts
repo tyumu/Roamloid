@@ -8,6 +8,7 @@ export type JoinedPayload = {
 
 export type MovedPayload = {
   to_device_name: string;
+  text: string;
 };
 
 export type ReceivePayload = {
@@ -18,6 +19,7 @@ export type ReceivePayload = {
 
 export type UseSocketManagerParams = {
   apiUrl: string;
+  deviceName: string;
   onJoined?: (payload: JoinedPayload) => void;
   onMoved3d?: (payload: MovedPayload) => void;
   onReceiveData?: (payload: ReceivePayload) => void;
@@ -33,6 +35,7 @@ export type UseSocketManagerReturn = {
 
 export const useSocketManager = ({
   apiUrl,
+  deviceName,
   onJoined,
   onMoved3d,
   onReceiveData,
@@ -65,10 +68,12 @@ export const useSocketManager = ({
 
     const handleConnect = () => {
       setIsConnected(true);
-      const deviceName = prompt("デバイス名を入力してください", "saba1");
       if (deviceName) {
+        console.log(`Socket: "${deviceName}" としてルームに参加します...`);
         socket.emit("join_room", { device_name: deviceName });
         setMyDeviceName(deviceName);
+      } else {
+        console.error("Socket: デバイス名が App.tsx から渡されませんでした。");
       }
     };
 
