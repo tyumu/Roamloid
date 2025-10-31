@@ -15,6 +15,8 @@ import { useNavigate } from "react-router-dom";
 import WarpParticles from "./components/WarpParticles";
 import ChatOverlay from "./components/ChatOverlay";
 import DebugMenu from "./components/DebugMenu";
+import AiStatusBadge from "./components/AiStatusBadge";
+import ChatLogPanel, { type ChatLogEntry } from "./components/ChatLogPanel";
 import { CharacterModel } from "./components/CharacterModel";
 import { useWarpControl } from "./hooks/useWarpControl";
 import {
@@ -160,6 +162,7 @@ export default function App() {
   const [selectedDebugOption, setSelectedDebugOption] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
 
   const navigate = useNavigate();
 
@@ -190,9 +193,27 @@ export default function App() {
     [setCharacterVisible]
   );
 
-  const handleReceiveData = useCallback((payload: ReceivePayload) => {
-    console.log("データ受信 (receive_data):", payload);
+  const appendChatEntry = useCallback((author: ChatLogEntry["author"], message: string) => {
+    const entry: ChatLogEntry = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      author,
+      message,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    setChatLog((prev) => [...prev, entry]);
   }, []);
+
+  const handleReceiveData = useCallback(
+    (payload: ReceivePayload) => {
+      const currentDevice = myDeviceNameRef.current;
+      if (payload.device_name === currentDevice) {
+        return;
+      }
+      appendChatEntry("AI", payload.text);
+      setIsChatOpen(true);
+    },
+    [appendChatEntry]
+  );
 
   const myDeviceNameRef = useRef<string | null>(null);
 
@@ -205,6 +226,7 @@ export default function App() {
       }
 
       const targetDevice = payload.to_device_name;
+      appendChatEntry("SYSTEM", `AIが${targetDevice}に移動しました。`);
       if (warpState !== "DEFAULT") {
         console.warn(`ワープ中 (state: ${warpState}) に移動イベントを受信。無視します。`);
         return;
@@ -226,7 +248,7 @@ export default function App() {
         triggerWarpOutOnly();
       }
     },
-    [characterVisible, sourceMesh, triggerWarpInOnly, triggerWarpOutOnly, warpState]
+    [appendChatEntry, characterVisible, sourceMesh, triggerWarpInOnly, triggerWarpOutOnly, warpState]
   );
 
   const { isLoading, aiLocation, myDeviceName, sendMessage } = useSocketManager({
@@ -290,12 +312,14 @@ export default function App() {
   );
 
   const handleSendMessage = useCallback(() => {
-    if (!chatInput.trim()) {
+    const trimmed = chatInput.trim();
+    if (!trimmed) {
       return;
     }
-    sendMessage(chatInput);
+    appendChatEntry("ME", trimmed);
+    sendMessage(trimmed);
     setChatInput("");
-  }, [chatInput, sendMessage]);
+  }, [appendChatEntry, chatInput, sendMessage]);
 
   const handleChatClose = useCallback(() => {
     setIsChatOpen(false);
@@ -330,6 +354,10 @@ export default function App() {
         onSelect={handleDebugSelect}
       />
 
+      <AiStatusBadge isPresent={characterVisible} location={aiLocation} />
+
+      <ChatLogPanel entries={chatLog} />
+
       <ChatOverlay
         isOpen={isChatOpen}
         message={chatInput}
@@ -337,25 +365,6 @@ export default function App() {
         onSubmit={handleSendMessage}
         onClose={handleChatClose}
       />
-
-      <div
-        style={{
-          position: "absolute",
-          top: 80,
-          left: 20,
-          color: "white",
-          zIndex: 1,
-          minWidth: 200,
-        }}
-      >
-        <p>
-          {characterVisible
-            ? "AIはここにいます"
-            : aiLocation
-            ? `AIは「${aiLocation}」にいます`
-            : "AIの現在地を取得中..."}
-        </p>
-      </div>
 
       <Canvas shadows camera={{ position: [3, 3, 3], fov: 60 }}>
         <color attach="background" args={["#e8e8e8"]} />
