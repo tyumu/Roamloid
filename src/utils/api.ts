@@ -1,4 +1,4 @@
-export const API_BASE: string = (import.meta as any)?.env?.VITE_API_BASE_URL || "http://localhost:5000";
+export const API_BASE: string = (import.meta as any)?.env?.VITE_API_BASE_URL || "https://roamloid-flask.onrender.com";
 
 export type ApiResult<T> = {
   ok: boolean;
