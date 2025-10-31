@@ -8,6 +8,7 @@ import * as THREE from 'three'
 import { useNavigate } from 'react-router-dom'
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js'
 import { io, Socket } from "socket.io-client";
+import { FaMapMarkerAlt, FaPaperPlane, FaRobot, FaUser } from 'react-icons/fa'; // アイコンライブラリ（react-icons）を追加
 
 const API_URL = "http://localhost:5000";
 
@@ -300,6 +301,10 @@ export default function App() {
 
   const [aiLocation, setAiLocation] = useState<string | null>(null); // AIの現在地を覚えておくための state
 
+  const [chatLog, setChatLog] = useState<{ author: "Me" | "AI" | "System", text: string }[]>([]);// チャットログ管理
+
+  const chatLogRef = useRef<HTMLDivElement>(null);//ログの自動スクロール用
+
   //   // クリップ名が揃ったらモックを開始
   // useEffect(() => {
   //   if (clipNames.length === 0) return
@@ -377,6 +382,11 @@ export default function App() {
     // (この関数は useEffect の中で定義するので、常に最新の myDeviceName と characterVisible を参照できる)
     const handleMoved3D = async (data: { to_device_name: string }) => {
         console.log('AIが移動しました (moved_3d):', data);
+        // チャットログにシステムメッセージを追加
+        setChatLog(prevLog => [
+            ...prevLog,
+            { author: "System", text: `AIが ${data.to_device_name} に移動しました。` }
+        ]);
         setAiLocation(data.to_device_name);// AIの現在地を更新
 
         // 既にワープ中 (DEFAULTじゃない) なら、この新しい `moved_3d` イベントは無視して、すぐに関数を終了する
@@ -575,7 +585,10 @@ export default function App() {
   // メッセージ送信ハンドラ
   const handleSendMessage = () => {
     if (chatMessage && socketRef.current) {
-        // バックエンド (handle_send_data) にメッセージを送信！
+        const myMessage = { author: "Me" as const, text: chatMessage };
+        setChatLog(prevLog => [...prevLog, myMessage]);
+
+        // バックエンド (handle_send_data) にメッセージを送信
         socketRef.current.emit('send_data', {
             device_name: myDeviceName,
             msg: chatMessage
@@ -583,87 +596,188 @@ export default function App() {
         setChatMessage(""); // 入力欄をクリア
     }
   };
-
+  // チャットログが更新されるたびにスクロールを一番下に移動させる
+  useEffect(() => {
+    if (chatLogRef.current) {
+      setTimeout(() => {
+        if (chatLogRef.current) {
+          // .current (div) の一番下 (scrollHeight) までスクロールさせる
+          chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
+        }
+      }, 0);
+    }
+  }, [chatLog]);
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
-      {/* ローディング画面を追加 (画面全体をミク色で覆う) ↓↓↓ */}
+    <div style={{ width: '100vw', height: '100vh', fontFamily: "'Inter', sans-serif", background: 'linear-gradient(135deg, #39C5BB 0%, #e8e8e8 100%)' }}>
+      {/* ローディング画面をアニメーション付きモーダルに変更 */}
       {isLoading && (
         <div style={{
-          position: 'absolute', top: 0, left: 0,
+          position: 'fixed', top: 0, left: 0,
           width: '100%', height: '100%',
-          backgroundColor: '#39C5BB',
-          zIndex: 9999,
+          background: 'linear-gradient(135deg, #39C5BB 80%,#373b3e 60%, #e12885 100%)',
+          zIndex: 10000,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'white'
+          color: 'white',
+          animation: 'fadeIn 0.5s ease-in-out'
         }}>
-          <p>Loading...</p>
+          <div style={{
+            width: '50px', height: '50px',
+            border: '4px solid #ffffff', // 半透明を避け、不透明な白に変更
+            borderTop: '4px solid #39C5BB', // アクセントにミク色を使用
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <p style={{ marginTop: '20px', fontSize: '18px', fontWeight: 'bold' }}>Loading...</p>
+          <style>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+          `}</style>
         </div>
       )}
 
-      {/*デバック用メニュー*/}
-      <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1 }}>
-        <select 
-          value={selectedDebugOption} 
-          onChange={(e) => { 
-            const value = e.target.value;
-            setSelectedDebugOption(value); // state を更新して選択を反映
-
-            if (value === 'loginページへ') {
-              navigate('/login');
-            } else if (value === 'ワープ (現在地 to 0,0,0)') {
-              triggerFullWarp();
-            } else if (value === '消えるだけ (現在地)') {
-              triggerWarpOut();
-            } else if (value === '現れるだけ (at 3,0,3)') {
-              triggerWarpIn();
-            } else if (clipNames.includes(value)) {
-              setRequestedAnimation(value);
-              setTimeout(() => setSelectedDebugOption(""), 100);
-            } else if (value !== "") {
-              // 選択肢以外 (例: "-- デバック用...") が選ばれたらリセット
-              setSelectedDebugOption("");
-            }
-          }}>
-          <option value="" disabled>-- デバック用メニュー --</option>
-          {clipNames.map(name => (
-            <option key={name} value={name}>{"アニメーション：" + name}</option>
-          ))}
-          <option value="loginページへ">ログインページへ</option>          
-          <option value="ワープ (現在地 to 0,0,0)" disabled={isWarping}>
-            ワープ (現在地 → 0,0,0)
-          </option>
-          <option value="消えるだけ (現在地)" disabled={isWarping}>
-            消えるだけ (現在地)
-          </option>
-          <option value="現れるだけ (at 3,0,3)" disabled={isWarping}>
-            現れるだけ (at 3,0,3)
-          </option>
-        </select>
+      {/* チャット入力エリアを洗練されたカードスタイルに変更 */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        padding: '12px 16px',
+        background: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: '25px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255,255,255,0.3)',
+        maxWidth: '90vw',
+        width: '400px'
+      }}>
+        <input 
+          type="text" 
+          value={chatMessage} 
+          onChange={(e) => setChatMessage(e.target.value)}
+          placeholder="AIにメッセージを送信..."
+          style={{
+            flex: 1,
+            background: 'transparent',
+            color: '#333',
+            border: 'none',
+            borderRadius: '20px',
+            padding: '10px 12px',
+            fontSize: '16px',
+            outline: 'none',
+            fontFamily: 'inherit'
+          }}
+        />
+        <button 
+          onClick={handleSendMessage} 
+          disabled={!chatMessage.trim()}
+          style={{
+            background: chatMessage.trim() ? 'linear-gradient(135deg, #39C5BB, #00ACC1)' : '#ccc',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: chatMessage.trim() ? 'pointer' : 'not-allowed',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 4px 12px rgba(57,197,187,0.3)'
+          }}
+          onMouseEnter={(e) => { if (chatMessage.trim()) e.currentTarget.style.transform = 'scale(1.1)'; }}
+          onMouseLeave={(e) => { if (chatMessage.trim()) e.currentTarget.style.transform = 'scale(1)'; }}
+        >
+          <FaPaperPlane size={16} />
+        </button>
       </div>
 
-      {/*チャット入力エリア*/}
-      <div style={{ position: 'absolute', bottom: 20, left: 20, zIndex: 1 }}>
-        <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)}/>
-        <button onClick={handleSendMessage}>送信</button>
-      </div>
-
-      {/* AIの現在地を表示するUI */}
-      <div style={{ position: 'absolute', top: 80, left: 20, color: 'white', zIndex: 1 }}>
-        <p>
-          {characterVisible ? " AIはここにいます" : `AIは「${aiLocation}」にいます`}
-        </p>
+      {/* AIの現在地表示をアイコン付きバッジに変更 */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '20px', 
+        left: '20px', 
+        zIndex: 1000,
+        background: 'rgba(255, 255, 255, 0.95)',
+        padding: '12px 16px',
+        borderRadius: '20px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255,255,255,0.3)',
+        display: 'flex',
+        alignItems: 'center',
+        fontSize: '14px',
+        color: '#333',
+        animation: 'slideInLeft 0.5s ease-out'
+      }}>
+        <FaMapMarkerAlt style={{ marginRight: '8px', color: characterVisible ? '#39C5BB' : '#ff6b6b' }} />
+        <span>{characterVisible ? "AIはここにいます" : `AIは「${aiLocation}」にいます`}</span>
+        <style>{`
+          @keyframes slideInLeft { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        `}</style>
       </div>
       
-      {/*AI(モック)テキスト表示エリア*/}
-      {/* 
-      <div style={{ position: 'absolute', top: 20, left: 20, color: 'white', zIndex: 1, backgroundColor: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '5px' }}>
-        <p>{displayText}</p>
+      {/* チャットログ表示エリアをメッセージカード形式に改良 */}
+      <div
+        ref={chatLogRef} 
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          zIndex: 1000,
+          background: 'rgba(255, 255, 255, 0.95)',
+          padding: '16px',
+          borderRadius: '16px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          width: '350px',
+          height: '300px',
+          overflowY: 'auto',
+          opacity: isLoading ? 0 : 1,
+          transition: 'opacity 0.3s',
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#39C5BB #f0f0f0'
+        }}
+      >
+        <div>
+          {chatLog.map((msg, index) => (
+            <div key={index} style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              marginBottom: '12px',
+              padding: '8px 12px',
+              borderRadius: '12px',
+              background: msg.author === 'Me' ? 'linear-gradient(135deg, #e3f2fd, #bbdefb)' : msg.author === 'AI' ? 'linear-gradient(135deg, #e8f5e8, #c8e6c9)' : 'rgba(0,0,0,0.05)',
+              animation: 'fadeInUp 0.3s ease-out'
+            }}>
+              <div style={{ marginRight: '8px', marginTop: '2px' }}>
+                {msg.author === 'Me' ? <FaUser color="#2196f3" /> : msg.author === 'AI' ? <FaRobot color="#4caf50" /> : <FaMapMarkerAlt color="#9e9e9e" />}
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '14px', color: '#333' }}>
+                  {msg.author === "System" ? <em>{msg.text}</em> : msg.text}
+                </p>
+                <small style={{ color: '#666', fontSize: '12px' }}>{new Date().toLocaleTimeString()}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+        <style>{`
+          @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+          ::-webkit-scrollbar { width: 6px; }
+          ::-webkit-scrollbar-track { background: #f0f0f0; border-radius: 10px; }
+          ::-webkit-scrollbar-thumb { background: #39C5BB; border-radius: 10px; }
+        `}</style>
       </div>
-       */}
+
       <Canvas shadows camera={{ position: [3, 3, 3], fov: 60 }}>
-        <color attach="background" args={['#e8e8e8']} />
+        <color attach="background" args={['#f5f5f5']} /> {/* UIと調和させるために背景色を変更 */}
         <Environment preset="city" environmentIntensity={0.5} />
         {/* Lights - トゥーン調に調整 */}
         <ambientLight intensity={0.6} color="#ffffff" />

@@ -1,39 +1,40 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaUser, FaLock, FaSignInAlt } from 'react-icons/fa'; // アイコンライブラリ（react-icons）を追加
+import { FaUser, FaLock, FaUserPlus } from 'react-icons/fa';
 
-const Login = () => {
-    // ↓ ユーザー名とパスワード用の状態を追加
+const Signup = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    const [message, setMessage] = useState(""); // エラーメッセージ用
-    const navigate = useNavigate(); // ← ページ遷移用フック
+    const [confirm, setConfirm] = useState("");
+    const [message, setMessage] = useState("");
+    const navigate = useNavigate();
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault(); // フォームのデフォルト送信をキャンセル
+    const handleSignup = async (e: React.FormEvent) => {
+        e.preventDefault();
         setMessage("");
-
-        // (本当は.envファイルで管理するのがベスト)
-        const API_URL = "http://localhost:5000"; 
-
+        if (!username || !password) {
+            setMessage("ユーザー名とパスワードを入力してください。");
+            return;
+        }
+        if (password !== confirm) {
+            setMessage("パスワードが一致しません。");
+            return;
+        }
         try {
-            const res = await fetch(`${API_URL}/api/auth/login`, {
+            const res = await fetch(`http://127.0.0.1:5000/api/auth/signup`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                credentials: "include", // クッキーを送受信するために追加
+                credentials: "include",
                 body: JSON.stringify({ username, password }),
             });
-
             const data = await res.json();
-
             if (res.ok) {
-                setMessage("ログイン成功！");
-                // ログインに成功したら、メインの3Dページ (/) に飛ばす
-                navigate("/"); 
+                setMessage("サインアップ成功！ログインページへ移動します。");
+                setTimeout(() => navigate("/login"), 1200);
             } else {
-                setMessage(data.error_message || "ログインに失敗しました。");
+                setMessage(data.error_message || "サインアップに失敗しました。");
             }
-        } catch (err) {
+        } catch {
             setMessage("通信エラーが発生しました。");
         }
     };
@@ -65,8 +66,8 @@ const Login = () => {
                     color: '#333',
                     fontSize: '28px',
                     fontWeight: 'bold'
-                }}>Login</h2>
-                <form style={{ display: 'flex', flexDirection: 'column' }} onSubmit={handleLogin}>
+                }}>Sign Up</h2>
+                <form style={{ display: 'flex', flexDirection: 'column' }} onSubmit={handleSignup}>
                     <div style={{ position: 'relative', marginBottom: '20px' }}>
                         <FaUser style={{
                             position: 'absolute',
@@ -95,7 +96,7 @@ const Login = () => {
                             onBlur={(e) => e.target.style.borderColor = '#ddd'}
                         />
                     </div>
-                    <div style={{ position: 'relative', marginBottom: '30px' }}>
+                    <div style={{ position: 'relative', marginBottom: '20px' }}>
                         <FaLock style={{
                             position: 'absolute',
                             left: '12px',
@@ -119,6 +120,34 @@ const Login = () => {
                             }}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            onFocus={(e) => e.target.style.borderColor = '#39C5BB'}
+                            onBlur={(e) => e.target.style.borderColor = '#ddd'}
+                        />
+                    </div>
+                    <div style={{ position: 'relative', marginBottom: '30px' }}>
+                        <FaLock style={{
+                            position: 'absolute',
+                            left: '12px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            color: '#39C5BB'
+                        }} />
+                        <input
+                            type="password"
+                            id="confirm"
+                            placeholder="Confirm password"
+                            style={{
+                                width: '100%',
+                                padding: '12px 12px 12px 40px',
+                                border: '1px solid #ddd',
+                                borderRadius: '10px',
+                                fontSize: '16px',
+                                outline: 'none',
+                                transition: 'border-color 0.3s',
+                                boxSizing: 'border-box'
+                            }}
+                            value={confirm}
+                            onChange={(e) => setConfirm(e.target.value)}
                             onFocus={(e) => e.target.style.borderColor = '#39C5BB'}
                             onBlur={(e) => e.target.style.borderColor = '#ddd'}
                         />
@@ -149,8 +178,8 @@ const Login = () => {
                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(57,197,187,0.3)';
                         }}
                     >
-                        <FaSignInAlt style={{ marginRight: '8px' }} />
-                        Login
+                        <FaUserPlus style={{ marginRight: '8px' }} />
+                        Sign Up
                     </button>
                 </form>
                 {message && (
@@ -164,8 +193,8 @@ const Login = () => {
                 )}
                 <div style={{ textAlign: 'center', marginTop: '20px' }}>
                     <p style={{ margin: '10px 0', color: '#666' }}>
-                        Don't have an account?{' '}
-                        <Link to="/signup" style={{
+                        すでにアカウントをお持ちですか？{' '}
+                        <Link to="/login" style={{
                             color: '#39C5BB',
                             textDecoration: 'none',
                             fontWeight: 'bold',
@@ -173,7 +202,7 @@ const Login = () => {
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.color = '#00ACC1'}
                         onMouseLeave={(e) => e.currentTarget.style.color = '#39C5BB'}
-                        >Sign up here</Link>
+                        >Login here</Link>
                     </p>
                 </div>
             </div>
@@ -185,4 +214,4 @@ const Login = () => {
     );
 };
 
-export default Login;
+export default Signup;
