@@ -207,7 +207,7 @@ export default function App() {
     (payload: ReceivePayload) => {
       const currentDevice = myDeviceNameRef.current;
       if (payload.device_name === currentDevice) {
-        return;
+        appendChatEntry("ME", payload.msg);
       }
       appendChatEntry("AI", payload.text);
       setIsChatOpen(true);

@@ -12,6 +12,7 @@ export type MovedPayload = {
 
 export type ReceivePayload = {
   device_name: string;
+  msg: string;
   text: string;
 };
 
