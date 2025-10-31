@@ -27,6 +27,7 @@ import {
 } from "./hooks/useSocketManager";
 
 import { API_BASE } from "./utils/api";
+import { append } from "three/tsl";
 
 function FloatingObjects() {
   const torusRef = useRef<THREE.InstancedMesh>(null!);
@@ -228,6 +229,9 @@ export default function App() {
       }
 
       const targetDevice = payload.to_device_name;
+      if (deviceName !== payload.device_name) {
+        appendChatEntry("ME", payload.msg);
+      }
       appendChatEntry("AI", payload.text);
       appendChatEntry("SYSTEM", `AIが${targetDevice}に移動しました。`);
       if (warpState !== "DEFAULT") {

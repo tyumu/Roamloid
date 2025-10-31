@@ -7,7 +7,9 @@ export type JoinedPayload = {
 };
 
 export type MovedPayload = {
+  device_name: string;
   to_device_name: string;
+  msg: string;
   text: string;
 };
 
