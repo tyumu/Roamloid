@@ -6,56 +6,41 @@
 ## このリポジトリでやりたいこと（用途）
 | 用途 | 目的 | 今の状態 |
 |------|------|----------|
-| リアルタイム接続 | SocketIO で接続/切断検知し状態共有 | 接続イベントのみ実装済み |
-| 認証基盤 | Firebase でユーザー識別 | まだ未接続（下準備のみ） |
-| アバター表現 | React Three Fiber で 3D 描画 | 回転する箱のプレースホルダ |
-| 会話/生成 | Gemini API を使った発話生成 | 未着手 |
-| Presence | 「今どこに居るか」記録と更新 | 未着手 |
-| 学習教材 | 初心者が少しずつ触れる構成 | シンプル README & ルール整備済み |
+| リアルタイム接続 | SocketIO で接続/切断検知し状態共有 | デバイス間の移動、チャット、Presenceを実装済み |
+| 認証基盤 | Flaskによるユーザー認証（サインアップ、ログイン、セッション管理） | 実装済み |
+| アバター表現 | React Three Fiber で 3D 描画 | GLBモデルとアニメーション、ワープエフェクトを実装済み |
+| 会話/生成 | Gemini API を使った発話生成 | 基本的なチャットUIとAI応答の仕組みを実装済み |
 
 ---
-## まず触ってみる（5 分）
-1. Backend 起動 → `/api/health` が 200 になるか
-2. Frontend 起動 → 3D の箱が回って表示されるか
-3. ブラウザ DevTools -> Network で `/api/hello` のレスポンスを確認
+## まず触ってみる（ローカル環境）
+1. Backend 起動 → `http://localhost:5000/api/health` が 200 になるか確認
+2. Frontend 起動 → `http://localhost:5173` にアクセス
+3. **アカウント作成**: `http://localhost:5173/register` を開き、新しいユーザーを作成します。
+4. **ログイン**: `http://localhost:5173/login` (ログインページ) に遷移するので、作成したアカウントでログインします。
+5. **デバイス選択**: デバイスを作成・選択し、3D空間に参加します。
+6. **操作**: 3Dキャラクターが表示され、TキーでチャットUIを開けます。
 
 ### Backend 起動 (Python 3.11+)
-```powershell
-cd backend
-python -m venv .venv
-. .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy ..\..\.env.example .env  # 失敗したら手動コピー
-python run.py  # http://localhost:5000/api/health
-```
-
+バックエンドのリポジトリはこちら↓
+https://github.com/arcsino/roamloid-flask
 ### Frontend 起動 (Node 18+)
 ```powershell
 npm install
-npm run dev  # http://localhost:5173/
+npm run dev
 ```
 
 ---
-## 今できること（API / Realtime 最小）
+## 今できること（API / Realtime）
 | 種別 | パス / イベント | 内容 |
 |------|-----------------|------|
-| HTTP | GET /api/health | サーバー生存確認 |
-| HTTP | GET /api/hello  | サンプル JSON |
-| WS   | connect         | 接続時 `system` メッセージ |
-
----
-## ディレクトリ概要
-```
-backend/
-	app/
-		routes/      # HTTP エンドポイント
-		realtime/    # SocketIO イベント
-		services/    # Firebase など外部連携予定
-src/             # React + Vite + 3D
-tests/           # Python テスト
-CONTRIBUTING.md  # ブランチ & コミット簡易ルール
-.env.example     # 環境変数サンプル
-```
+| HTTP | POST /api/auth/signup | ユーザー登録 |
+| HTTP | POST /api/auth/login | ログイン（セッション開始） |
+| HTTP | GET /api/room/devices | ユーザーに紐づくデバイス一覧を取得 |
+| HTTP | POST /api/room/devices | 新規デバイスを作成 |
+| WS   | join_room       | 指定したデバイス名でルームに参加 |
+| WS   | send_data       | AIへのメッセージ送信 |
+| WS   | receive_data    | AIからの応答メッセージ受信 |
+| WS   | moved_3d        | AIが別デバイスへ移動した通知 |
 
 ---
 ## 開発の基本フロー
@@ -74,6 +59,7 @@ docs: update readme for setup
 
 ---
 ## .env 作成例（開発）
+`.env` ファイルをプロジェクトルートに作成します。
 ```
 APP_ENV=development
 DEBUG=1
@@ -81,35 +67,16 @@ LOG_LEVEL=INFO
 CORS_ORIGINS=http://localhost:5173
 # FIREBASE_CREDENTIALS_JSON={"type":"service_account", ...}
 ```
+`.env.development` ファイルをプロジェクトルートに作成します。
+```
+VITE_API_BASE_URL=http://localhost:5000
+```
 
 ---
 ## よくあるトラブルと対処
 | 症状 | ヒント |
 |------|--------|
 | ImportError / ModuleNotFoundError | venv 有効化したか / `pip install -r requirements.txt` 済みか |
-| CORS エラー | `.env` の CORS_ORIGINS が合っているか |
+| CORS エラー | `.env` の CORS_ORIGINS が `http://localhost:5173` になっているか |
 | 500 エラー | ターミナルのスタックトレースを読む / 変更直前を戻す |
 | ポート競合 | 既に他プロセスが 5000 or 5173 を使用していないか |
-
----
-## 次のステップ（段階的）
-1. Firebase クライアント SDK 導入 → 匿名ログイン → token をヘッダに付ける
-2. Backend に `/api/me` 追加（token をデコードして uid 返す）
-3. Presence: 接続/切断で Firestore に状態保存
-4. Gemini: テキスト生成を SocketIO でストリーム送信
-5. アバター: 生成テキスト → 表情 / 動き へ反映
-
-焦らず「動く最小」→「拡張」の順に進める。
-
----
-## 参加するときの考え方
-| 状態 | どうする | 目的 |
-|------|----------|------|
-| 何を触ればいいかわからない | README の「次のステップ」から 1 つ選ぶ | 学習の迷子防止 |
-| 変更が大きくなりそう | 先に小さく分割して 2 PR に | レビューしやすく |
-| 詰まった | 失敗手順をメモして共有 | 再発防止 |
-
----
-## ライセンス
-TBD
-
