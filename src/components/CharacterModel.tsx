@@ -7,7 +7,7 @@ import { Points, PointMaterial, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
 //aisamples.tsxの文字列を順番に通知していく
-import { aiSamples } from './aisamples'
+import { aiSamples } from '../utils/aisamples'
 export type AIMockHandle = { stop: () => void }
 
 export function startAIMock(onText: (text: string) => void, interval = 2500, loop = true): AIMockHandle {
