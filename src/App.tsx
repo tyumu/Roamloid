@@ -339,20 +339,35 @@ export default function App() {
       {isLoading && (
         <div
           style={{
-            position: "absolute",
+            position: "fixed",
             top: 0,
             left: 0,
             width: "100%",
             height: "100%",
-            backgroundColor: "#39C5BB",
+            background: "linear-gradient(135deg, #39C5BB 80%,#373b3e 60%, #e12885 100%)",
             zIndex: 9999,
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             color: "white",
           }}
         >
-          <p>Loading...</p>
+        <div
+          style={{
+            width: "50px",
+            height: "50px",
+            border: "4px solid #ffffff",
+            borderTop: "4px solid #39C5BB",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite"
+          }}
+        ></div>
+        <p style={{ marginTop: "20px", fontSize: "18px", fontWeight: "bold" }}>Loading...</p>
+        <style>{`
+          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        `}</style>
         </div>
       )}
 

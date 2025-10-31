@@ -12,6 +12,7 @@ export type ChatLogEntry = {
 
 type ChatLogPanelProps = {
   entries: ChatLogEntry[];
+  isLoading?: boolean;
 };
 
 const containerStyle: React.CSSProperties = {
@@ -24,13 +25,24 @@ const containerStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   padding: 16,
+  boxSizing: "border-box",
   borderRadius: 16,
   background: "rgba(255, 255, 255, 0.95)",
   border: "1px solid rgba(255, 255, 255, 0.3)",
   boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
   backdropFilter: "blur(10px)",
-  overflowY: "auto",
+  overflowY: "hidden",
   gap: 12,
+};
+
+const innerScrollStyle: React.CSSProperties = {
+  width: "100%",
+  maxHeight: "100%",
+  height: "100%",
+  overflowY: "auto",
+  paddingRight: 12,
+  boxSizing: "border-box",
+  overflowX: "hidden",
 };
 
 const entryStyle: React.CSSProperties = {
@@ -39,7 +51,7 @@ const entryStyle: React.CSSProperties = {
   gap: 10,
   padding: "8px 12px",
   borderRadius: 12,
-  animation: "fadeInUp 0.3s ease-out",
+  maxWidth: "100%",
 };
 
 const textBlockStyle: React.CSSProperties = {
@@ -55,6 +67,7 @@ const messageStyle: React.CSSProperties = {
   fontSize: 14,
   lineHeight: 1.4,
   wordBreak: "break-word",
+  overflowWrap: "break-word",
 };
 
 const timestampStyle: React.CSSProperties = {
@@ -70,6 +83,14 @@ const iconWrapperStyle: React.CSSProperties = {
   marginTop: 2,
 };
 
+const headerStyle: React.CSSProperties = {
+  marginBottom: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#222",
+  paddingLeft: 4,
+};
+
 const getEntryColors = (author: ChatLogAuthor) => {
   switch (author) {
     case "ME":
@@ -81,37 +102,63 @@ const getEntryColors = (author: ChatLogAuthor) => {
   }
 };
 
-const ChatLogPanel: React.FC<ChatLogPanelProps> = ({ entries }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+const ChatLogPanel: React.FC<ChatLogPanelProps> = ({ entries, isLoading = false }) => {
+   const innerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const element = containerRef.current;
-    if (element) {
-      element.scrollTop = element.scrollHeight;
-    }
-  }, [entries]);
+   useEffect(() => {
+     const element = innerRef.current;
+     if (element) {
+       element.scrollTop = element.scrollHeight;
+     }
+   }, [entries]);
 
-  return (
-    <div style={containerStyle} ref={containerRef}>
-      {entries.map((entry) => {
-        const colors = getEntryColors(entry.author);
-        const IconComponent =
-          entry.author === "ME" ? FaUser : entry.author === "AI" ? FaRobot : FaInfoCircle;
+   return (
+     <>
+       <div
+         style={{
+           ...containerStyle,
+           top: 20,
+           right: 20,
+           zIndex: 1000,
+           width: 350,
+           maxHeight: 300,
+           opacity: isLoading ? 0 : 1,
+           transition: "opacity 0.3s",
+           scrollbarWidth: "thin",
+           scrollbarColor: "#39C5BB #f0f0f0",
+         }}
+       >
+         <div ref={innerRef} className="chatlog-scroll" style={innerScrollStyle}>
+           <div style={headerStyle}>チャットログ:</div>
 
-        return (
-          <div key={entry.id} style={{ ...entryStyle, background: colors.background }}>
-            <div style={iconWrapperStyle}>
-              <IconComponent color={colors.icon} size={14} />
-            </div>
-            <div style={textBlockStyle}>
-              <p style={messageStyle}>{entry.author === "SYSTEM" ? <em>{entry.message}</em> : entry.message}</p>
-              <span style={timestampStyle}>{entry.timestamp}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+           {entries.map((entry) => {
+             const colors = getEntryColors(entry.author);
+             const IconComponent =
+               entry.author === "ME" ? FaUser : entry.author === "AI" ? FaRobot : FaInfoCircle;
+
+             return (
+               <div key={entry.id} style={{ ...entryStyle, background: colors.background, marginBottom: 12 }}>
+                 <div style={iconWrapperStyle}>
+                   <IconComponent color={colors.icon} size={14} />
+                 </div>
+                 <div style={textBlockStyle}>
+                   <p style={messageStyle}>{entry.author === "SYSTEM" ? <em>{entry.message}</em> : entry.message}</p>
+                   <span style={timestampStyle}>{entry.timestamp}</span>
+                 </div>
+               </div>
+             );
+           })}
+         </div>
+       </div>
+       <style>{`
+         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+         /* WebKit ブラウザ用スクロールバー */
+         .chatlog-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+         .chatlog-scroll::-webkit-scrollbar-track { background: #f0f0f0; border-radius: 10px; }
+         .chatlog-scroll::-webkit-scrollbar-thumb { background: #39C5BB; border-radius: 10px; }
+       `}</style>
+     </>
+   );
+ };
 
 export default ChatLogPanel;
