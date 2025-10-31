@@ -271,13 +271,22 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // 入力フィールドにフォーカスがある場合は何もしない
+      const target = event.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+        return;
+      }
+
       if (event.key.toLowerCase() === "t") {
-        setIsChatOpen((prev) => !prev);
+        event.preventDefault();
+        if (!isChatOpen) {
+          setIsChatOpen(true);
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [isChatOpen]);
 
   const handleDebugSelect = useCallback(
     (value: string) => {
